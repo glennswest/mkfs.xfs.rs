@@ -190,15 +190,15 @@ for case in "${CASES[@]}"; do
         repair "$img" && post=OK || post=FAIL
         results=""
         for c in $CHECKS; do
-            grep -q "^RESULT $c" <<< "$out" && results="$results ${c%_OK}" || results="$results !${c%_OK}"
+            grep -q "RESULT $c" <<< "$out" && results="$results ${c%_OK}" || results="$results !${c%_OK}"
         done
         if [ $who = ours ]; then
             [ $pre = OK ] && ok "xfs_repair -n before" || { bad "xfs_repair -n before"; cat "$img.repair" | head -20; }
             for c in $CHECKS; do
-                grep -q "^RESULT $c" <<< "$out" && ok "kernel: ${c%_OK}" || bad "kernel: ${c%_OK}"
+                grep -q "RESULT $c" <<< "$out" && ok "kernel: ${c%_OK}" || bad "kernel: ${c%_OK}"
             done
             [ $post = OK ] && ok "xfs_repair -n after the kernel wrote" || { bad "xfs_repair -n after"; head -20 "$img.repair"; }
-            grep -q '^RESULT DONE' <<< "$out" || { echo "    (VM did not finish)"; tail -30 <<< "$out" | sed 's/^/    /'; }
+            grep -q "RESULT DONE" <<< "$out" || { echo "    (VM did not finish)"; tail -30 <<< "$out" | sed 's/^/    /'; }
             grep -E '^(ERR|STATFS)' <<< "$out" | sed 's/^/    /'
             grep '^DMESG' <<< "$out" | grep -iE 'error|corrupt|fail|warn' | sed 's/^/    /' | head -10
         else
