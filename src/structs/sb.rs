@@ -189,7 +189,7 @@ pub fn encode(g: &Geometry, s: &SbState, sector: &mut [u8]) {
     put64(b, ROOTINO, s.rootino);
     put64(b, RBMINO, s.rbmino);
     put64(b, RSUMINO, s.rsumino);
-    put32(b, REXTSIZE, 1);
+    put32(b, REXTSIZE, g.rextsize());
     put32(b, AGBLOCKS, g.agsize as u32);
     put32(b, AGCOUNT, g.agcount as u32);
     put32(b, RBMBLOCKS, 0);
@@ -221,8 +221,7 @@ pub fn encode(g: &Geometry, s: &SbState, sector: &mut [u8]) {
         b[LOGSECTLOG] = g.lsectlog;
         put16(b, LOGSECTSIZE, g.lsectsize as u16);
     }
-    // A v2 log with no stripe unit records 1, never 0.
-    put32(b, LOGSUNIT, 1);
+    put32(b, LOGSUNIT, g.logsunit());
     put32(b, FEATURES2, features2(g));
     put32(b, BAD_FEATURES2, features2(g));
     put32(b, FEATURES_COMPAT, 0);

@@ -114,6 +114,8 @@ pub struct Geo {
     pub logblocks: u64,
     /// Log sector size (0 for 512).
     pub logsectsize: u64,
+    /// Log stripe unit in bytes (1 for none).
+    pub logsunit: u32,
     /// ro-compat and incompat features.
     pub ro_compat: u32,
     #[allow(missing_docs)]
@@ -142,6 +144,7 @@ impl Geo {
             logstart: be64(b, LOGSTART),
             logblocks: u64::from(be32(b, LOGBLOCKS)),
             logsectsize: u64::from(be16(b, LOGSECTSIZE)),
+            logsunit: be32(b, LOGSUNIT),
             ro_compat: be32(b, FEATURES_RO_COMPAT),
             incompat: be32(b, FEATURES_INCOMPAT),
         };
@@ -555,7 +558,7 @@ pub async fn dump<D: BlockDevice + ?Sized>(dev: &D) -> Result<Dump> {
     let log_agbno = g.logstart & ((1 << g.agblklog) - 1);
     let log_at = g.byte(log_ag, log_agbno);
     let first = read(dev, log_at, bs).await?;
-    let sunit = log::clear_sunit(g.logsectsize as u32);
+    let sunit = log::clear_sunit(g.logsunit, g.logsectsize as u32);
     let rec_len = if sunit > 0 { (sunit as usize).div_ceil(512) } else { 2 }.max(2) * 512;
     {
         use log::off::*;

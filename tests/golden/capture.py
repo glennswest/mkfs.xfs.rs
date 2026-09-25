@@ -33,6 +33,7 @@ CASES = {
     "xfs-512m-v5-minimal": ("512M", ["-m", "finobt=0,rmapbt=0,reflink=0,inobtcount=0",
                                      "-i", "sparse=0,nrext64=0"]),
     "xfs-1g-b16384": ("1G", ["-b", "size=16384"]),
+    "xfs-2g-s4096-b16384": ("2G", ["-s", "size=4096", "-b", "size=16384"]),
 }
 
 

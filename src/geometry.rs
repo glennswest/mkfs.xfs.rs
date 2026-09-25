@@ -711,6 +711,37 @@ impl Geometry {
         u64::from(cluster >> self.blocklog)
     }
 
+    /// `sb_rextsize`: with no realtime device, `validate_rtextsize` makes
+    /// the realtime extent `XFS_MIN_RTEXTSIZE` (4 KiB) or one block,
+    /// whichever is larger.
+    pub fn rextsize(&self) -> u32 {
+        if self.blocksize < 4096 {
+            4096 >> self.blocklog
+        } else {
+            1
+        }
+    }
+
+    /// The log stripe unit in bytes, 0 for none. `calc_stripe_factors`
+    /// gives a log whose sector is larger than a log record header (512
+    /// bytes) a stripe unit of one filesystem block.
+    pub fn lsunit_bytes(&self) -> u32 {
+        if self.lsectsize > 512 {
+            self.blocksize
+        } else {
+            0
+        }
+    }
+
+    /// `sb_logsunit`: the stripe unit, or 1 — never 0 — for a v2 log
+    /// without one.
+    pub fn logsunit(&self) -> u32 {
+        match self.lsunit_bytes() {
+            0 => 1,
+            n => n,
+        }
+    }
+
     /// `sb_spino_align`.
     pub fn spino_align(&self) -> u32 {
         if self.features.sparse {

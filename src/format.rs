@@ -420,7 +420,8 @@ pub async fn format<D: BlockDevice + ?Sized>(dev: &D, params: &Params) -> Result
     // libxfs_log_clear: zero the log, then its first record.
     let log_at = g.agb_to_byte(g.logagno, g.log_agbno);
     dev.write_zeroes(log_at, g.logblocks * bs).await?;
-    let rec = log::first_record(&uuid, log::clear_sunit(g.lsectsize));
+    let logsectsize = if g.sectsize > 512 { g.lsectsize } else { 0 };
+    let rec = log::first_record(&uuid, log::clear_sunit(g.logsunit(), logsectsize));
     let mut first = vec![0u8; bs as usize];
     first[..rec.len()].copy_from_slice(&rec);
     dev.write_at(log_at, &first).await?;

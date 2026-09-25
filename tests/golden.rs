@@ -39,6 +39,7 @@ fn cases() -> Vec<(&'static str, Params)> {
         ("xfs-600m-agcount2", p().agcount(2)),
         ("xfs-512m-v5-minimal", p().features(minimal)),
         ("xfs-1g-b16384", p().block_size(16384)),
+        ("xfs-2g-s4096-b16384", p().sector_size(4096).block_size(16384)),
     ]
 }
 

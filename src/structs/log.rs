@@ -42,14 +42,14 @@ pub mod off {
     pub const SIZE: usize = 320;
 }
 
-/// The log stripe unit `libxfs_log_clear` is given: `sb_logsunit`, which is
-/// 1 when there is none, stands for the log sector size — zero for a
-/// 512-byte log sector.
-pub fn clear_sunit(lsectsize: u32) -> u32 {
-    if lsectsize > 512 {
-        lsectsize
+/// The stripe unit `libxfs_log_clear` is given (`prepare_devices`):
+/// `sb_logsunit`, except that 1 — no stripe unit — stands for
+/// `sb_logsectsize`, which is 0 for a 512-byte log sector.
+pub fn clear_sunit(logsunit: u32, logsectsize: u32) -> u32 {
+    if logsunit == 1 {
+        logsectsize
     } else {
-        0
+        logsunit
     }
 }
 
