@@ -1,0 +1,9 @@
+[package]
+name = "mkfs-xfs"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Async XFS formatter and checker in pure Rust — a from-scratch reimplementation of mkfs.xfs and xfs_repair -n"
+repository = "https://github.com/glennswest/mkfs.xfs.rs"
+
+[dependencies]
