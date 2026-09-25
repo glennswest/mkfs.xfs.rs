@@ -34,7 +34,49 @@ CASES = {
                                      "-i", "sparse=0,nrext64=0"]),
     "xfs-1g-b16384": ("1G", ["-b", "size=16384"]),
     "xfs-2g-s4096-b16384": ("2G", ["-s", "size=4096", "-b", "size=16384"]),
+    # Past what the build box's filesystem holds as a file: captured where
+    # a 1 PiB sparse file is possible.
+    "xfs-16t-default": ("16T", []),
+    "xfs-1p-default": ("1P", []),
 }
+
+
+def data_extents(fd, total):
+    """(start, end) of each allocated extent: a 1 PiB image is read only
+    where it holds data."""
+    off = 0
+    while off < total:
+        try:
+            start = os.lseek(fd, off, os.SEEK_DATA)
+        except OSError:
+            return
+        end = os.lseek(fd, start, os.SEEK_HOLE)
+        yield start, end
+        off = end
+
+
+def nonzero_runs(path, total):
+    """Runs of non-zero blocks, as (offset, bytes)."""
+    with open(path, "rb") as f:
+        for start, end in data_extents(f.fileno(), total):
+            start -= start % BLOCK
+            f.seek(start)
+            run_start, run = None, []
+            off = start
+            while off < end:
+                blk = f.read(min(BLOCK, total - off))
+                if not blk:
+                    break
+                if any(blk):
+                    if run_start is None:
+                        run_start = off
+                    run.append(blk)
+                elif run_start is not None:
+                    yield run_start, b"".join(run)
+                    run_start, run = None, []
+                off += len(blk)
+            if run_start is not None:
+                yield run_start, b"".join(run)
 
 
 def capture(name, size, opts):
@@ -46,25 +88,8 @@ def capture(name, size, opts):
         version = subprocess.run(["mkfs.xfs", "-V"], capture_output=True, text=True).stdout.strip()
         total = os.path.getsize(img)
         out = [b"XFSSPRS1", struct.pack(">Q", total)]
-        with open(img, "rb") as f:
-            run_start, run = None, []
-            off = 0
-            while True:
-                blk = f.read(BLOCK)
-                if not blk:
-                    break
-                if any(blk):
-                    if run_start is None:
-                        run_start = off
-                    run.append(blk)
-                elif run_start is not None:
-                    data = b"".join(run)
-                    out.append(struct.pack(">QI", run_start, len(data)) + data)
-                    run_start, run = None, []
-                off += len(blk)
-            if run_start is not None:
-                data = b"".join(run)
-                out.append(struct.pack(">QI", run_start, len(data)) + data)
+        for start, data in nonzero_runs(img, total):
+            out.append(struct.pack(">QI", start, len(data)) + data)
     with open(os.path.join(HERE, f"{name}.sparse.gz"), "wb") as raw:
         with gzip.GzipFile(fileobj=raw, mode="wb", compresslevel=9, mtime=0) as g:
             g.write(b"".join(out))

@@ -40,6 +40,9 @@ fn cases() -> Vec<(&'static str, Params)> {
         ("xfs-512m-v5-minimal", p().features(minimal)),
         ("xfs-1g-b16384", p().block_size(16384)),
         ("xfs-2g-s4096-b16384", p().sector_size(4096).block_size(16384)),
+        // 16 AGs of the maximum 1 TiB, a 2 GiB log; then 1024 of them.
+        ("xfs-16t-default", p()),
+        ("xfs-1p-default", p()),
     ]
 }
 
