@@ -2,8 +2,52 @@
 name = "mkfs-xfs"
 version = "0.1.0"
 edition = "2021"
+authors = ["Glenn West"]
 license = "MIT OR Apache-2.0"
 description = "Async XFS formatter and checker in pure Rust — a from-scratch reimplementation of mkfs.xfs and xfs_repair -n"
 repository = "https://github.com/glennswest/mkfs.xfs.rs"
+rust-version = "1.75"
+keywords = ["xfs", "mkfs", "filesystem", "async"]
+categories = ["filesystem", "asynchronous"]
+
+[lib]
+name = "mkfs_xfs"
+path = "src/lib.rs"
 
 [dependencies]
+# Async runtime: only what the device layer and the formatter need. A
+# consumer running a full tokio is unaffected.
+tokio = { version = "1", features = ["fs", "rt", "sync", "macros"] }
+async-trait = "0.1"
+futures = "0.3"
+thiserror = "2"
+# Random UUIDs and inode generation numbers, as mkfs.xfs draws them.
+uuid = { version = "1", features = ["v4"] }
+
+# CLI binaries only.
+clap = { version = "4", features = ["derive"], optional = true }
+anyhow = { version = "1", optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+tempfile = "3"
+# The golden reference images are stored compressed.
+flate2 = "1"
+
+[features]
+default = ["cli"]
+# The mkfs-xfs binary. Library consumers turn this off.
+cli = ["dep:clap", "dep:anyhow", "tokio/rt-multi-thread"]
+
+# Rust will not accept a "." in a binary name. Install it as mkfs.xfs if it
+# should answer to `mkfs -t xfs`.
+[[bin]]
+name = "mkfs-xfs"
+path = "src/bin/mkfs_xfs.rs"
+required-features = ["cli"]
+
+[profile.release]
+lto = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { version = "1.1.4", features = ["fs"] }
