@@ -34,7 +34,16 @@ let report = format(&dev, &Params::new().label("data")).await?;
 `BlockDevice` is the seam: a consumer formats its own volume (in memory,
 network-backed, a thin volume) by implementing it, and nothing else touches
 a `/dev` node. `MemDevice` is sparse, so a 1 PiB filesystem formats in memory
-in a fraction of a second.
+in a fraction of a second. The trait's default `write_zeroes` writes zero
+blocks, 1 MiB at a time; a device with write-zeroes or a discard that zeroes
+should override it, since the log alone can be 2 GiB (`FileDevice` punches
+holes in regular files).
+
+Every `Params` field is optional and left to `mkfs.xfs`'s choice when unset
+(`agsize`, `imaxpct` and the rest are public fields; the common ones also
+have builder methods). `uuid`, `time` and `gen_seed` pin what `mkfs.xfs`
+draws at random or from the clock, so a format is reproducible byte for
+byte. A label is at most 12 bytes.
 
 The CLI takes `mkfs.xfs`'s option syntax for what it supports:
 

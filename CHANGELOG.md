@@ -9,6 +9,10 @@
   how it ships (git tags, no service or config, stormblock as consumer, not a
   stormcentral component); the concurrency=0 equivalence is marked untested;
   known gaps link #2–#7.
+- **docs:** README checked against the code again. It now covers the
+  library-side behaviour it left out: `write_zeroes` and when to override it,
+  `Params` fields with no builder, reproducible formats through
+  `uuid`/`time`/`gen_seed`, and the 12-byte label limit.
 
 ## [v0.2.0] — 2026-09-25
 
