@@ -52,7 +52,8 @@ The CLI takes `mkfs.xfs`'s option syntax for what it supports:
              [-m uuid=U,finobt=0|1,rmapbt=0|1,reflink=0|1,inobtcount=0|1,bigtime=0|1]
              [-N] [-q] [-f] [--create SIZE] DEVICE
 
-`-N` prints the geometry and writes nothing; `-f` is accepted and ignored
+`-N` prints the geometry and writes nothing (its log `sunit` reads 0 even
+where the filesystem has a one-block log stripe unit — #9); `-f` is accepted and ignored
 (an existing filesystem is never refused); `-m crc=1` is accepted, anything
 else not listed is an error. `--create SIZE` makes a sparse image file of
 that size first. Sizes take `k`/`m`/`g`/`t`/`p` (binary) suffixes. Install

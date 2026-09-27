@@ -13,6 +13,10 @@
   library-side behaviour it left out: `write_zeroes` and when to override it,
   `Params` fields with no builder, reproducible formats through
   `uuid`/`time`/`gen_seed`, and the 12-byte label limit.
+- **docs:** Third check of README, CLAUDE.md and crate docs against the code
+  (CLI options and suffixes, refusals, overwrite clearing, `write_zeroes`,
+  stormblock's `v0.2.0` pin): accurate. The `-N` report's hardcoded log
+  `sunit=0` is filed as #9 and noted in the README.
 
 ## [v0.2.0] — 2026-09-25
 
