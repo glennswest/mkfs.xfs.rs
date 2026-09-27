@@ -1,10 +1,16 @@
 # CLAUDE.md — mkfs.xfs.rs
 
-XFS formatter and checker in pure Rust. Follow mkfs.ext4.rs's structure and
+XFS formatter (checker planned, #7) in pure Rust. Follow mkfs.ext4.rs's structure and
 rules (read its CLAUDE.md): from the on-disk spec, held to real `mkfs.xfs`
 output by a comparison tool and golden tests, async block I/O, no kernel.
 
-- **Crate:** `mkfs-xfs` (lib `mkfs_xfs`), binary `mkfs-xfs`
+- **Crate:** `mkfs-xfs` (lib `mkfs_xfs`), binary `mkfs-xfs` (feature `cli`,
+  on by default)
+- **Ships as:** git tags; no service, ports or config file; not a
+  stormcentral component (no golden). **Consumer:** stormblock
+  (`tag = "v0.2.0"`, `default-features = false`) formats XFS volumes with
+  `format` and stamps clone UUIDs using `structs::sb::off`/`version` — keep
+  those public and stable; `admin::set_uuid/set_label` is #6.
 - **Version:** see `Cargo.toml` and `VERSION` (both must match)
 - **Reference:** xfsprogs 6.15.0 (`mkfs/xfs_mkfs.c`, `libxfs/xfs_ag.c`,
   `libxfs/topology.c`, `libxfs/rdwr.c`, `mkfs/proto.c`) — the version on
@@ -53,12 +59,13 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
 - [ ] Non-rotational (concurrency) geometry — issue #3 (owner decision on
       whether to use it)
 - [ ] Overwrite hygiene: stale secondaries, discard — issue #5
+- [ ] `xfs_admin -U/-L` over `BlockDevice` for stormblock's clones — issue #6
 - [ ] Lazy formatting where XFS allows. Note: a format already writes only
       headers, roots, one inode chunk and the log (1 PiB: ~0.1 s in memory);
       what remains is the 2 GiB log zeroing on devices without write-zeroes.
 - [x] Comparison tool vs real mkfs.xfs and golden tests, run on dev
 - [ ] Checker (an `xfs_repair -n` subset): structural validation — build it
-      on `inspect`
+      on `inspect` — issue #7
 - [ ] Large sizes measured on stormcos's emulated large drives (layout at
       16 TiB and 1 PiB already golden-tested)
 

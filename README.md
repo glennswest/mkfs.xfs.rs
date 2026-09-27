@@ -19,8 +19,8 @@ AGFL, free-space / inode / free-inode / reverse-mapping / refcount btree
 root, the root inode chunk and the log — differing only in what `mkfs.xfs`
 draws at random or from the clock (timestamps, inode generation numbers, and
 the CRCs over them). The kernel mounts it read-write, writes to it and
-leaves it consistent. A checker (`xfs_repair -n` subset) is next; see the
-work plan in `CLAUDE.md`.
+leaves it consistent. There is no checker yet — an `xfs_repair -n` subset
+is planned (#7); see the work plan in `CLAUDE.md`.
 
 ## Use
 
@@ -41,9 +41,13 @@ The CLI takes `mkfs.xfs`'s option syntax for what it supports:
     mkfs-xfs [-b size=N] [-s size=N] [-i size=N,maxpct=N,sparse=0|1,nrext64=0|1]
              [-d size=N,agcount=N,agsize=N] [-L label]
              [-m uuid=U,finobt=0|1,rmapbt=0|1,reflink=0|1,inobtcount=0|1,bigtime=0|1]
-             [-N] [-q] [--create SIZE] DEVICE
+             [-N] [-q] [-f] [--create SIZE] DEVICE
 
-Install it as `mkfs.xfs` if `mkfs -t xfs` should find it.
+`-N` prints the geometry and writes nothing; `-f` is accepted and ignored
+(an existing filesystem is never refused); `-m crc=1` is accepted, anything
+else not listed is an error. `--create SIZE` makes a sparse image file of
+that size first. Sizes take `k`/`m`/`g`/`t`/`p` (binary) suffixes. Install
+the binary as `mkfs.xfs` if `mkfs -t xfs` should find it.
 
 ## Defaults, and what is refused
 
@@ -53,14 +57,18 @@ nrext64 and sparse inodes, the AG count and log size its calculations give.
 
 - **Geometry is `mkfs.xfs`'s for a file or a rotational disk.** On a
   non-rotational device `mkfs.xfs` instead sizes AGs and the log from the
-  formatting host's CPU count; that path is not reproduced (the same
-  filesystem as `mkfs.xfs -d concurrency=0 -l concurrency=0`).
+  formatting host's CPU count; that path is not reproduced (#3). Per the
+  xfsprogs source this is also the geometry of `mkfs.xfs -d concurrency=0
+  -l concurrency=0`; that equivalence is not tested.
 - **No stripe geometry yet** (`su`/`sw`, or a device's reported `io_min` /
-  `io_opt`).
+  `io_opt`) — #4.
+- **An old filesystem on the device is not cleared** beyond the first and
+  last 128 KiB: no discard, stale secondary superblocks stay — #5.
+- **No `xfs_admin`-style UUID/label change** — #6.
 - **Refused, not approximated:** filesystems under 300 MB (which `mkfs.xfs`
   also refuses) and block sizes over 16 KiB. Both are where `mkfs.xfs` sizes
   the log from the minimum log size, which is the whole transaction
-  reservation table and not implemented here.
+  reservation table and not implemented here (#2).
 
 ## How it is held to `mkfs.xfs`
 
@@ -82,6 +90,17 @@ every allocated chunk, the log record and whether the rest of the log is
 zero — into named fields, and classes each difference: **structural**,
 **identity** (the UUID) or **incidental** (random or clock-derived).
 Golden images are captured with `tests/golden/capture.py`.
+
+## How it ships
+
+A library crate (`mkfs-xfs`, lib `mkfs_xfs`) plus the `mkfs-xfs` binary
+behind the default `cli` feature. No service, ports or configuration file:
+everything is `Params` (or the CLI flags above). Releases are git tags
+(`v0.2.0`); consumers depend on a tag with `default-features = false`.
+stormblock does, to format XFS volumes, and stamps each clone's UUID with
+`structs::sb::off` / `structs::sb::version` — so those offsets and the
+public `structs` API are relied on (the operation itself moving here is
+#6). It is not a stormcentral component: there is no golden.
 
 ## License
 

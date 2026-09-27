@@ -3,6 +3,13 @@
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
+### 2026-09-27
+- **docs:** Refreshed from the code: the crate description no longer promises
+  a checker (filed as #7); README documents `-f`, `-m crc=1`, size suffixes and
+  how it ships (git tags, no service or config, stormblock as consumer, not a
+  stormcentral component); the concurrency=0 equivalence is marked untested;
+  known gaps link #2–#7.
+
 ## [v0.2.0] — 2026-09-25
 
 ### Added
