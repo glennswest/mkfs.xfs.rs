@@ -57,7 +57,9 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
 - [ ] Stripe geometry (su/sw, device io_min/io_opt) — issue #4
 - [ ] Minimum log size: < 300 MB and block sizes > 16 KiB — issue #2
 - [ ] Non-rotational (concurrency) geometry — issue #3 (owner decision on
-      whether to use it)
+      whether to use it: #8)
+- [ ] CLI `-N`/post-format report prints log `sunit=0` where the image has
+      a one-block log stripe unit (4 KiB log sectors) — issue #9
 - [ ] Overwrite hygiene: stale secondaries, discard — issue #5
 - [ ] `xfs_admin -U/-L` over `BlockDevice` for stormblock's clones — issue #6
 - [ ] Lazy formatting where XFS allows. Note: a format already writes only

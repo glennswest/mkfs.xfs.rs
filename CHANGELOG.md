@@ -17,6 +17,8 @@
   (CLI options and suffixes, refusals, overwrite clearing, `write_zeroes`,
   stormblock's `v0.2.0` pin): accurate. The `-N` report's hardcoded log
   `sunit=0` is filed as #9 and noted in the README.
+- **docs:** CLAUDE.md work plan lists #9 and points #3's owner decision at
+  #8; no code has changed since the last check, so the README stands.
 
 ## [v0.2.0] — 2026-09-25
 
