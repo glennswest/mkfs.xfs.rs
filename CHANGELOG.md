@@ -3,6 +3,12 @@
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
+### 2026-09-28
+- **docs:** Rechecked README, CLAUDE.md and crate docs against the code (no
+  code change since v0.2.0): CLI options, 128 KiB overwrite clearing, 12-byte
+  label limit, the `-N` log `sunit=0` (#9) and stormblock's `v0.2.0` pin all
+  match. Nothing new promised that the code does not do; open gaps stay #2–#9.
+
 ### 2026-09-27
 - **docs:** Refreshed from the code: the crate description no longer promises
   a checker (filed as #7); README documents `-f`, `-m crc=1`, size suffixes and
