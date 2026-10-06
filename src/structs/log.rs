@@ -1,6 +1,8 @@
 //! The internal log as `mkfs.xfs` leaves it: zeroed, with one record at
 //! its start holding an unmount record, so the kernel finds a clean log at
 //! cycle 1 (`libxfs_log_clear` with `XLOG_INIT_CYCLE`, `libxfs_log_header`).
+//! [`record`] is the general `libxfs_log_header`, which `xfs_admin -U`'s
+//! log clear also writes at later cycles ([`crate::admin`]).
 
 use crate::bytes::*;
 
@@ -22,7 +24,7 @@ pub const CLIENT_LOG: u8 = 0xaa;
 /// `XLOG_UNMOUNT_TRANS`.
 pub const UNMOUNT_TRANS: u8 = 0x20;
 /// Basic block size.
-const BBSIZE: usize = 512;
+pub const BBSIZE: usize = 512;
 
 /// Field offsets in `struct xlog_rec_header`.
 #[allow(missing_docs)]
@@ -53,17 +55,28 @@ pub fn clear_sunit(logsunit: u32, logsectsize: u32) -> u32 {
     }
 }
 
+/// `xlog_assign_lsn`: a log sequence number, cycle and basic block.
+pub fn lsn(cycle: u32, block: u32) -> u64 {
+    (u64::from(cycle) << 32) | u64::from(block)
+}
+
 /// The first log record: header, unmount record, and any remaining basic
 /// blocks of the record stamped with the cycle. `sunit` in bytes, as
 /// [`clear_sunit`] gives it.
 pub fn first_record(uuid: &[u8; 16], sunit: u32) -> Vec<u8> {
-    let cycle: u32 = 1;
-    let lsn: u64 = u64::from(cycle) << 32;
-    // libxfs_log_clear: the record is the stripe unit, at least two blocks.
-    let len_bb = if sunit > 0 { (sunit as usize).div_ceil(BBSIZE) } else { 2 }.max(2);
-    let mut rec = vec![0u8; len_bb * BBSIZE];
+    let l = lsn(1, 0);
+    record(uuid, sunit, l, l)
+}
 
+/// One log record holding only an unmount record, as `libxfs_log_header`
+/// writes it: `max(BTOBB(sunit), headers + 1)` basic blocks, at least two,
+/// every block after the unmount record zero but for the cycle stamp.
+/// `sunit` in bytes (0 for none).
+pub fn record(uuid: &[u8; 16], sunit: u32, lsn: u64, tail_lsn: u64) -> Vec<u8> {
+    let cycle = (lsn >> 32) as u32;
     let hdrs = if sunit > HEADER_CYCLE_SIZE { sunit.div_ceil(HEADER_CYCLE_SIZE) } else { 1 };
+    let len_bb = if sunit > 0 { (sunit as usize).div_ceil(BBSIZE) } else { 1 }.max(hdrs as usize + 1);
+    let mut rec = vec![0u8; len_bb * BBSIZE];
     {
         let h = &mut rec[..BBSIZE];
         put32(h, off::MAGICNO, HEADER_MAGIC);
@@ -75,7 +88,7 @@ pub fn first_record(uuid: &[u8; 16], sunit: u32) -> Vec<u8> {
         put32(h, off::FMT, FMT_LINUX_LE);
         put32(h, off::SIZE, sunit.max(BIG_RECORD_BSIZE));
         put64(h, off::LSN, lsn);
-        put64(h, off::TAIL_LSN, lsn);
+        put64(h, off::TAIL_LSN, tail_lsn);
         h[off::FS_UUID..off::FS_UUID + 16].copy_from_slice(uuid);
         put32(h, off::LEN, (BBSIZE as u32 * 2).max(sunit) - hdrs * BBSIZE as u32);
     }

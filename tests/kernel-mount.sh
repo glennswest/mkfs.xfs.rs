@@ -9,6 +9,10 @@
 # second check is the one that counts: a filesystem the kernel mounts,
 # writes to and leaves consistent is a working filesystem.
 #
+# Then xfs-admin -U on the log the kernel left (#6): a copy re-stamped by
+# real xfs_admin -U and one by ours must be identical byte for byte, and
+# ours must mount, take writes and pass xfs_repair -n again.
+#
 # No root: the VM boots the host's own kernel under qemu (KVM when
 # /dev/kvm is usable) from an initramfs built here — busybox, xfs.ko and
 # an init script — with the image as a virtio disk. Every case runs twice,
@@ -26,7 +30,7 @@ bad() { echo "  FAIL: $1"; FAILURES=$((FAILURES+1)); }
 hdr() { echo; echo "-- $1 --"; }
 need() { command -v "$1" >/dev/null || { echo "missing $1 — cannot run"; exit 2; }; }
 
-for t in qemu-system-x86_64 busybox xz python3 mkfs.xfs xfs_repair cargo; do need "$t"; done
+for t in qemu-system-x86_64 busybox xz python3 mkfs.xfs xfs_repair xfs_admin cmp cargo; do need "$t"; done
 
 KVER=$(uname -r)
 KERNEL=""
@@ -47,9 +51,11 @@ WORK=$(mktemp -d "$SCRATCH/kernel-mount.XXXXXX")
 trap 'rm -rf "$WORK"' EXIT
 UUID=12345678-1234-5678-9abc-123456789abc
 
-hdr "building mkfs-xfs"
-cargo build --quiet --bin mkfs-xfs || { echo "cargo build failed"; exit 1; }
+hdr "building mkfs-xfs and xfs-admin"
+cargo build --quiet --bin mkfs-xfs --bin xfs-admin || { echo "cargo build failed"; exit 1; }
 MKFS="${CARGO_TARGET_DIR:-target}/debug/mkfs-xfs"
+ADMIN="${CARGO_TARGET_DIR:-target}/debug/xfs-admin"
+NEWUUID=0badc0de-1234-4321-8765-0123456789ab
 
 hdr "building the initramfs (kernel $KVER, $ACCEL)"
 ROOT="$WORK/root"
@@ -201,11 +207,27 @@ for case in "${CASES[@]}"; do
             grep -q "RESULT DONE" <<< "$out" || { echo "    (VM did not finish)"; tail -30 <<< "$out" | sed 's/^/    /'; }
             grep -E '^(ERR|STATFS)' <<< "$out" | sed 's/^/    /'
             grep '^DMESG' <<< "$out" | grep -iE 'error|corrupt|fail|warn' | sed 's/^/    /' | head -10
+            # A new UUID over the log the kernel wrote and unmounted.
+            cp --sparse=always "$img" "$img.xa-theirs"; cp --sparse=always "$img" "$img.xa-ours"
+            xfs_admin -U $NEWUUID "$img.xa-theirs" >/dev/null 2>&1 || bad "xfs_admin -U (control)"
+            if "$ADMIN" -U $NEWUUID "$img.xa-ours" >/dev/null; then
+                cmp -s "$img.xa-ours" "$img.xa-theirs" \
+                    && ok "xfs-admin -U over the kernel's log: identical to xfs_admin -U" \
+                    || bad "xfs-admin -U differs from xfs_admin -U ($(cmp "$img.xa-ours" "$img.xa-theirs" | head -1))"
+                out=$(boot "$img.xa-ours")
+                for c in MOUNT_OK UMOUNT_OK REMOUNT_OK; do
+                    grep -q "RESULT $c" <<< "$out" && ok "kernel, new UUID: ${c%_OK}" || bad "kernel, new UUID: ${c%_OK}"
+                done
+                repair "$img.xa-ours" && ok "xfs_repair -n after the new UUID" \
+                    || { bad "xfs_repair -n after the new UUID"; head -20 "$img.xa-ours.repair"; }
+            else
+                bad "xfs-admin -U"
+            fi
         else
             echo "    control (real mkfs.xfs): repair-before=$pre repair-after=$post kernel:$results"
         fi
     done
-    rm -f "$WORK/$name".*.img
+    rm -f "$WORK/$name".*
 done
 
 hdr "result"

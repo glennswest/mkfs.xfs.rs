@@ -1,4 +1,4 @@
-//! Errors surfaced by formatting and inspecting a filesystem.
+//! Errors surfaced by formatting, inspecting and changing a filesystem.
 
 use std::io;
 
@@ -42,6 +42,12 @@ pub enum Error {
     /// On-disk metadata failed a structural check.
     #[error("corrupt metadata: {0}")]
     Corrupt(String),
+
+    /// The filesystem is not in a state an offline change may be made in:
+    /// its log holds changes to replay, or it is marked as needing
+    /// `xfs_repair`. `xfs_admin` refuses the same filesystems.
+    #[error("filesystem needs recovery: {0}")]
+    NeedsRecovery(String),
 }
 
 impl Error {

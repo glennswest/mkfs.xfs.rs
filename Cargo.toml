@@ -36,7 +36,7 @@ flate2 = "1"
 
 [features]
 default = ["cli"]
-# The mkfs-xfs binary. Library consumers turn this off.
+# The mkfs-xfs and xfs-admin binaries. Library consumers turn this off.
 cli = ["dep:clap", "dep:anyhow", "tokio/rt-multi-thread"]
 
 # Rust will not accept a "." in a binary name. Install it as mkfs.xfs if it
@@ -44,6 +44,11 @@ cli = ["dep:clap", "dep:anyhow", "tokio/rt-multi-thread"]
 [[bin]]
 name = "mkfs-xfs"
 path = "src/bin/mkfs_xfs.rs"
+required-features = ["cli"]
+
+[[bin]]
+name = "xfs-admin"
+path = "src/bin/xfs_admin.rs"
 required-features = ["cli"]
 
 [profile.release]

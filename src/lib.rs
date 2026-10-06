@@ -1,7 +1,8 @@
 //! Async **XFS** formatter in pure Rust — a from-scratch reimplementation of
-//! `mkfs.xfs`, written from the XFS on-disk format and held to real
-//! `mkfs.xfs` output: [`compare`] diffs every metadata field of two
-//! filesystems, and the golden tests fail on any structural difference.
+//! `mkfs.xfs` (and of `xfs_admin -U`/`-L`, in [`admin`]), written from the
+//! XFS on-disk format and held to real `mkfs.xfs` output: [`compare`]
+//! diffs every metadata field of two filesystems, and the golden tests fail
+//! on any structural difference.
 //!
 //! ```no_run
 //! # async fn f() -> mkfs_xfs::Result<()> {
@@ -20,11 +21,13 @@
 //! | [`format`] | the formatter |
 //! | [`inspect`] | read any v5 XFS filesystem's metadata into named fields |
 //! | [`compare`] | diff two filesystems field by field |
+//! | [`admin`] | `xfs_admin -U` / `-L`: a new UUID or label for an existing filesystem |
 //! | [`crc`] | CRC32C as XFS uses it |
 
 #![deny(missing_docs)]
 #![forbid(unsafe_code)]
 
+pub mod admin;
 pub mod bytes;
 pub mod compare;
 pub mod crc;
