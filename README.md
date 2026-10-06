@@ -107,10 +107,20 @@ A library crate (`mkfs-xfs`, lib `mkfs_xfs`) plus the `mkfs-xfs` binary
 behind the default `cli` feature. No service, ports or configuration file:
 everything is `Params` (or the CLI flags above). Releases are git tags
 (`v0.2.0`); consumers depend on a tag with `default-features = false`.
-stormblock does, to format XFS volumes, and stamps each clone's UUID with
-`structs::sb::off` / `structs::sb::version` — so those offsets and the
-public `structs` API are relied on (the operation itself moving here is
-#6). It is not a stormcentral component: there is no golden.
+stormblock does, to format XFS volumes and stamp each clone's UUID (the
+stamping itself moving here is #6). It relies on, and so these stay public
+and stable:
+
+- `device::BlockDevice` — it implements the trait over its own volumes
+  (`size`, `logical_sector_size`, `read_at`, `write_at`, `flush`,
+  `write_zeroes`), returning `Error::io(offset, err)` and `Result`;
+- `geometry::Params::new()` with `.uuid()`, `.label()`, `.block_size()`;
+- `format::format` and its `Report` (`geometry.blocksize`, `dblocks`,
+  `agcount`, `agsize`, `logblocks`; `fdblocks`; `uuid`);
+- `crc::verify` / `crc::stamp` — checking and re-stamping a superblock CRC;
+- `structs::sb::off` and `structs::sb::version` — superblock field offsets.
+
+It is not a stormcentral component: there is no golden.
 
 ## License
 

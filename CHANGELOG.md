@@ -3,6 +3,13 @@
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
+### 2026-10-06
+- **docs:** README and CLAUDE.md list every API stormblock uses (checked
+  against stormblock `src/fs/xfs.rs` at `origin/main`): the `BlockDevice`
+  trait, `Error::io`, `Params::new().uuid()/.label()/.block_size()`,
+  `format::format` and `Report`, `crc::verify`/`crc::stamp`, and
+  `structs::sb::off`/`version` (#10).
+
 ### 2026-09-28
 - **docs:** Rechecked README, CLAUDE.md and crate docs against the code (no
   code change since v0.2.0): CLI options, 128 KiB overwrite clearing, 12-byte

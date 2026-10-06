@@ -8,9 +8,14 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
   on by default)
 - **Ships as:** git tags; no service, ports or config file; not a
   stormcentral component (no golden). **Consumer:** stormblock
-  (`tag = "v0.2.0"`, `default-features = false`) formats XFS volumes with
-  `format` and stamps clone UUIDs using `structs::sb::off`/`version` — keep
-  those public and stable; `admin::set_uuid/set_label` is #6.
+  (`tag = "v0.2.0"`, `default-features = false`, `src/fs/xfs.rs`) formats
+  XFS volumes and stamps clone UUIDs. Keep public and stable everything it
+  uses: `device::BlockDevice` (it implements `size`, `logical_sector_size`,
+  `read_at`, `write_at`, `flush`, `write_zeroes`), `Error::io`, `Result`,
+  `geometry::Params::new()` with `.uuid()`/`.label()`/`.block_size()`,
+  `format::format` and `Report` (`geometry.{blocksize,dblocks,agcount,
+  agsize,logblocks}`, `fdblocks`, `uuid`), `crc::verify`/`crc::stamp`, and
+  `structs::sb::off`/`version`. `admin::set_uuid/set_label` is #6.
 - **Version:** see `Cargo.toml` and `VERSION` (both must match)
 - **Reference:** xfsprogs 6.15.0 (`mkfs/xfs_mkfs.c`, `libxfs/xfs_ag.c`,
   `libxfs/topology.c`, `libxfs/rdwr.c`, `mkfs/proto.c`) — the version on
