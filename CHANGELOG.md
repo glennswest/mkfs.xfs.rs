@@ -4,6 +4,12 @@
 <!-- New unreleased changes go here -->
 
 ### 2026-10-06
+- **fix:** The `-N` and post-format report printed the log `sunit=0 blks`
+  always; it now prints the log stripe unit the filesystem has — one block
+  when the log sector is over 512 bytes (`-s size=4096`, 512e/4Kn devices),
+  as mkfs.xfs 6.15 does. The image was already right. New
+  `tests/cli_report.rs` checks the report and compares its log lines with
+  `mkfs.xfs -N` (#9).
 - **docs:** README and CLAUDE.md list every API stormblock uses (checked
   against stormblock `src/fs/xfs.rs` at `origin/main`): the `BlockDevice`
   trait, `Error::io`, `Params::new().uuid()/.label()/.block_size()`,

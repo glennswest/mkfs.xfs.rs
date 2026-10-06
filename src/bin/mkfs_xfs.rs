@@ -160,7 +160,12 @@ fn report(g: &Geometry, name: &str) {
         1u32 << g.dirblocklog
     );
     println!("log      =internal log           bsize={:<6} blocks={}, version=2", g.blocksize, g.logblocks);
-    println!("         ={:<22} sectsz={:<5} sunit=0 blks, lazy-count=1", "", g.lsectsize);
+    println!(
+        "         ={:<22} sectsz={:<5} sunit={} blks, lazy-count=1",
+        "",
+        g.lsectsize,
+        g.lsunit_bytes() / g.blocksize
+    );
 }
 
 #[tokio::main]
