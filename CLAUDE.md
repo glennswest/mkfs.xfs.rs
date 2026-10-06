@@ -101,7 +101,7 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
 - `sc-build` — unit tests, `tests/golden.rs`, `tests/live_mkfs_xfs.rs`
   (uses dev's mkfs.xfs/xfs_repair; skips elsewhere), `tests/live_xfs_admin.rs`
   (byte-identical to dev's xfs_admin), `tests/device_io.rs`.
-- `tests/vm/` — the same in a throwaway VM through `stormcentral testhost
+- `tests/vm/` — format, kernel mount/write/remount, `xfs_repair -n` and `xfs-admin -U` in a throwaway VM through `stormcentral testhost
   boot nanatest1` (README "How it is held"); pass line `VERIFY PASS`.
 - `sc-build tests/kernel-mount.sh` — kernel mount/write/remount in qemu+KVM
   with the host kernel and an initramfs built from busybox and xfs.ko; no
