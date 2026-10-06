@@ -3,6 +3,21 @@
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
+### 2026-10-06
+- **feat:** `admin::set_uuid`, `admin::restore_uuid` and `admin::set_label`
+  — `xfs_admin -U` / `-U restore` / `-L` over `BlockDevice`, leaving the
+  device byte for byte as xfsprogs 6.15's `xfs_db` does: a clean-log check
+  (`xlog_find_tail`, ported from libxlog; a dirty log is refused with the
+  new `Error::NeedsRecovery`), the whole log rewritten under the new UUID
+  at the next cycle (`libxfs_log_clear`), and every AG's superblock with
+  `META_UUID` / `sb_meta_uuid` handled as `do_uuid` does. Also
+  `admin::log_state`. New `xfs-admin` binary (#6).
+- **feat:** `structs::log::record` and `lsn` — the general
+  `libxfs_log_header`; `first_record` is built on it.
+- **test:** `tests/live_xfs_admin.rs` holds `admin` to `xfs_admin` byte for
+  byte across log cycles, block and sector sizes and log stripe units;
+  `tests/kernel-mount.sh` re-stamps the log the kernel left and mounts it.
+
 ## [v0.2.1] — 2026-10-06
 
 ### Fixed

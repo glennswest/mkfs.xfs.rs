@@ -19,7 +19,8 @@ AGFL, free-space / inode / free-inode / reverse-mapping / refcount btree
 root, the root inode chunk and the log — differing only in what `mkfs.xfs`
 draws at random or from the clock (timestamps, inode generation numbers, and
 the CRCs over them). The kernel mounts it read-write, writes to it and
-leaves it consistent. There is no checker yet — an `xfs_repair -n` subset
+leaves it consistent. `admin` gives an existing filesystem a new UUID or
+label exactly as `xfs_admin -U` / `-L` do (below). There is no checker yet — an `xfs_repair -n` subset
 is planned (#7); see the work plan in `CLAUDE.md`.
 
 ## Use
@@ -60,6 +61,37 @@ else not listed is an error. `--create SIZE` makes a sparse image file of
 that size first. Sizes take `k`/`m`/`g`/`t`/`p` (binary) suffixes. Install
 the binary as `mkfs.xfs` if `mkfs -t xfs` should find it.
 
+## A new UUID or label: `admin`, `xfs-admin`
+
+```rust
+use mkfs_xfs::admin;
+
+admin::set_uuid(&dev, new_uuid).await?;   // xfs_admin -U
+admin::restore_uuid(&dev).await?;         // xfs_admin -U restore
+admin::set_label(&dev, "data").await?;    // xfs_admin -L
+```
+
+These leave the device byte for byte as `xfs_admin` 6.15 leaves it (the
+`xfs_db` `uuid` and `label` commands), for an unmounted filesystem:
+
+- **UUID.** The old UUID stays in `sb_meta_uuid` and the `META_UUID`
+  feature is set, since every v5 metadata block names it; setting the
+  metadata UUID again clears both. Like `xfs_admin`, it first finds the
+  log's head and tail and refuses a log with changes to replay
+  (`Error::NeedsRecovery` — mount and unmount it first), then **rewrites
+  the whole log** under the new UUID at the next cycle: `sb_logblocks` of
+  writes, 64 MiB below 128 GiB and up to 2 GiB. On a thin volume that
+  allocates the log.
+- **Label.** At most 12 bytes; empty clears it. Only the superblocks are
+  written.
+- Every AG's superblock is rewritten as `xfs_db` rewrites it, which also
+  turns quota inode fields of 0 into `NULLFSINO`.
+- Refused: a filesystem marked `NEEDSREPAIR`, an external log, a realtime
+  device, unknown incompat features.
+
+The `xfs-admin` binary is the same from the command line:
+`xfs-admin [-U uuid|generate|nil|restore] [-L label|--] DEVICE`.
+
 ## Defaults, and what is refused
 
 The defaults are `mkfs.xfs` 6.15's: 4 KiB blocks, 512-byte inodes, the
@@ -75,7 +107,6 @@ nrext64 and sparse inodes, the AG count and log size its calculations give.
   `io_opt`) — #4.
 - **An old filesystem on the device is not cleared** beyond the first and
   last 128 KiB: no discard, stale secondary superblocks stay — #5.
-- **No `xfs_admin`-style UUID/label change** — #6.
 - **Refused, not approximated:** filesystems under 300 MB (which `mkfs.xfs`
   also refuses) and block sizes over 16 KiB. Both are where `mkfs.xfs` sizes
   the log from the minimum log size, which is the whole transaction
@@ -87,7 +118,8 @@ nrext64 and sparse inodes, the AG count and log size its calculations give.
 |---|---|
 | `tests/golden.rs` | 12 images made by `mkfs.xfs` 6.15.0 with the UUID pinned (`tests/golden/`, stored sparse: 2 KB each, 184 KB for 1 PiB), from 300 MB to 1 PiB, across block sizes 1–16 KiB, 512 and 4096-byte sectors, inode sizes, AG counts, a label and a minimal feature set. Ours must match every structural field. |
 | `tests/live_mkfs_xfs.rs` | Against the `mkfs.xfs` installed where the tests run (dev.g8.lo), 777 MB to 8 TiB: field-for-field equal, and `xfs_repair -n` clean. Skips where there is no xfsprogs. |
-| `tests/kernel-mount.sh` | A real kernel, in a VM, no root: `xfs_repair -n`, mount read-write, write a file, directories, 300 files and 4 MiB, unmount, remount, `xfs_repair -n` again — on our image and, as a control, on `mkfs.xfs`'s. |
+| `tests/kernel-mount.sh` | A real kernel, in a VM, no root: `xfs_repair -n`, mount read-write, write a file, directories, 300 files and 4 MiB, unmount, remount, `xfs_repair -n` again — on our image and, as a control, on `mkfs.xfs`'s. Then `xfs-admin -U` over the log the kernel left: identical to `xfs_admin -U`, and the kernel mounts it again. |
+| `tests/live_xfs_admin.rs` | `admin` against the `xfs_admin` installed where the tests run: images made by `mkfs.xfs` (block sizes 1–8 KiB, 4 KiB sectors, log stripe units of 32 and 256 KiB, nine AGs) are changed step by step — labels, new UUIDs through log cycles 1 → 4, back to the metadata UUID, `restore` — and must be identical to `xfs_admin`'s byte for byte after every step; `xfs_repair -n` clean. |
 | `tests/device_io.rs` | Whole-block I/O on a device that enforces a 4 KiB sector; a 1 PiB format in memory. |
 
     sc-build                          # build and every Rust test
@@ -104,12 +136,13 @@ Golden images are captured with `tests/golden/capture.py`.
 
 ## How it ships
 
-A library crate (`mkfs-xfs`, lib `mkfs_xfs`) plus the `mkfs-xfs` binary
-behind the default `cli` feature. No service, ports or configuration file:
+A library crate (`mkfs-xfs`, lib `mkfs_xfs`) plus the `mkfs-xfs` and
+`xfs-admin` binaries behind the default `cli` feature. No service, ports or configuration file:
 everything is `Params` (or the CLI flags above). Releases are git tags
 (latest `v0.2.1`); consumers depend on a tag with `default-features = false`.
-stormblock does, to format XFS volumes and stamp each clone's UUID (the
-stamping itself moving here is #6). It relies on, and so these stay public
+stormblock does, to format XFS volumes and stamp each clone's UUID (it
+stamps superblocks itself today; `admin::set_uuid` is the `xfs_admin`
+equivalent, #6). It relies on, and so these stay public
 and stable:
 
 - `device::BlockDevice` — it implements the trait over its own volumes

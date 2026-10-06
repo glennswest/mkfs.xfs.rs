@@ -1,11 +1,12 @@
 # CLAUDE.md — mkfs.xfs.rs
 
-XFS formatter (checker planned, #7) in pure Rust. Follow mkfs.ext4.rs's structure and
+XFS formatter and `xfs_admin -U/-L` (checker planned, #7) in pure Rust.
+Follow mkfs.ext4.rs's structure and
 rules (read its CLAUDE.md): from the on-disk spec, held to real `mkfs.xfs`
 output by a comparison tool and golden tests, async block I/O, no kernel.
 
-- **Crate:** `mkfs-xfs` (lib `mkfs_xfs`), binary `mkfs-xfs` (feature `cli`,
-  on by default)
+- **Crate:** `mkfs-xfs` (lib `mkfs_xfs`), binaries `mkfs-xfs` and
+  `xfs-admin` (feature `cli`, on by default)
 - **Ships as:** git tags; no service, ports or config file; not a
   stormcentral component (no golden). **Consumer:** stormblock
   (`tag = "v0.2.0"`, `default-features = false`, `src/fs/xfs.rs`) formats
@@ -15,7 +16,8 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
   `geometry::Params::new()` with `.uuid()`/`.label()`/`.block_size()`,
   `format::format` and `Report` (`geometry.{blocksize,dblocks,agcount,
   agsize,logblocks}`, `fdblocks`, `uuid`), `crc::verify`/`crc::stamp`, and
-  `structs::sb::off`/`version`. `admin::set_uuid/set_label` is #6.
+  `structs::sb::off`/`version`. `admin::set_uuid`/`set_label` (#6) are
+  there for it to replace its own superblock stamping.
 - **Version:** see `Cargo.toml` and `VERSION` (both must match)
 - **Reference:** xfsprogs 6.15.0 (`mkfs/xfs_mkfs.c`, `libxfs/xfs_ag.c`,
   `libxfs/topology.c`, `libxfs/rdwr.c`, `mkfs/proto.c`) — the version on
@@ -32,6 +34,7 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
 | `format` | `plan_ag` computes each AG's end state (free extents, AGFL, rmap records, root chunk); `format` writes it, AGs in parallel |
 | `inspect` | reads any v5 XFS into named, classed fields (structural / identity / incidental) |
 | `compare` | diffs two dumps |
+| `admin` | `xfs_admin -U`/`-L`: log head/tail search (libxlog port), full log clear, per-AG superblock rewrite as `xfs_db` does it |
 
 ## Rules learned from the goldens
 
@@ -88,7 +91,8 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
 ## Testing
 
 - `sc-build` — unit tests, `tests/golden.rs`, `tests/live_mkfs_xfs.rs`
-  (uses dev's mkfs.xfs/xfs_repair; skips elsewhere), `tests/device_io.rs`.
+  (uses dev's mkfs.xfs/xfs_repair; skips elsewhere), `tests/live_xfs_admin.rs`
+  (byte-identical to dev's xfs_admin), `tests/device_io.rs`.
 - `sc-build tests/kernel-mount.sh` — kernel mount/write/remount in qemu+KVM
   with the host kernel and an initramfs built from busybox and xfs.ko; no
   root. Runs each case on mkfs.xfs's image too, as a control.
