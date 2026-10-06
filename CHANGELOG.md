@@ -3,41 +3,28 @@
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
-### 2026-10-06
-- **fix:** The `-N` and post-format report printed the log `sunit=0 blks`
+## [v0.2.1] — 2026-10-06
+
+### Fixed
+- The `-N` and post-format report printed the log `sunit=0 blks`
   always; it now prints the log stripe unit the filesystem has — one block
   when the log sector is over 512 bytes (`-s size=4096`, 512e/4Kn devices),
   as mkfs.xfs 6.15 does. The image was already right. New
   `tests/cli_report.rs` checks the report and compares its log lines with
   `mkfs.xfs -N` (#9).
-- **docs:** README and CLAUDE.md list every API stormblock uses (checked
-  against stormblock `src/fs/xfs.rs` at `origin/main`): the `BlockDevice`
-  trait, `Error::io`, `Params::new().uuid()/.label()/.block_size()`,
-  `format::format` and `Report`, `crc::verify`/`crc::stamp`, and
-  `structs::sb::off`/`version` (#10).
 
-### 2026-09-28
-- **docs:** Rechecked README, CLAUDE.md and crate docs against the code (no
-  code change since v0.2.0): CLI options, 128 KiB overwrite clearing, 12-byte
-  label limit, the `-N` log `sunit=0` (#9) and stormblock's `v0.2.0` pin all
-  match. Nothing new promised that the code does not do; open gaps stay #2–#9.
-
-### 2026-09-27
-- **docs:** Refreshed from the code: the crate description no longer promises
-  a checker (filed as #7); README documents `-f`, `-m crc=1`, size suffixes and
-  how it ships (git tags, no service or config, stormblock as consumer, not a
-  stormcentral component); the concurrency=0 equivalence is marked untested;
-  known gaps link #2–#7.
-- **docs:** README checked against the code again. It now covers the
-  library-side behaviour it left out: `write_zeroes` and when to override it,
-  `Params` fields with no builder, reproducible formats through
-  `uuid`/`time`/`gen_seed`, and the 12-byte label limit.
-- **docs:** Third check of README, CLAUDE.md and crate docs against the code
-  (CLI options and suffixes, refusals, overwrite clearing, `write_zeroes`,
-  stormblock's `v0.2.0` pin): accurate. The `-N` report's hardcoded log
-  `sunit=0` is filed as #9 and noted in the README.
-- **docs:** CLAUDE.md work plan lists #9 and points #3's owner decision at
-  #8; no code has changed since the last check, so the README stands.
+### Documentation
+- README and CLAUDE.md list every API stormblock uses (checked against
+  stormblock `src/fs/xfs.rs`): the `BlockDevice` trait, `Error::io`,
+  `Params::new().uuid()/.label()/.block_size()`, `format::format` and
+  `Report`, `crc::verify`/`crc::stamp`, and `structs::sb::off`/`version`
+  (#10).
+- README documents `-f`, `-m crc=1`, size suffixes, how it ships (git tags,
+  no service or config, stormblock as consumer), `write_zeroes` and when to
+  override it, `Params` fields with no builder, reproducible formats through
+  `uuid`/`time`/`gen_seed`, and the 12-byte label limit; the crate
+  description no longer promises a checker (#7). Several rechecks of README,
+  CLAUDE.md and crate docs against the code (2026-09-27, 2026-09-28).
 
 ## [v0.2.0] — 2026-09-25
 
