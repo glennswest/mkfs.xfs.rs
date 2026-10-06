@@ -145,7 +145,7 @@ Golden images are captured with `tests/golden/capture.py`.
 A library crate (`mkfs-xfs`, lib `mkfs_xfs`) plus the `mkfs-xfs` and
 `xfs-admin` binaries behind the default `cli` feature. No service, ports or configuration file:
 everything is `Params` (or the CLI flags above). Releases are git tags
-(latest `v0.2.1`); consumers depend on a tag with `default-features = false`.
+(latest `v0.3.0`); consumers depend on a tag with `default-features = false`.
 stormblock does, to format XFS volumes and stamp each clone's UUID (it
 stamps superblocks itself today; `admin::set_uuid` is the `xfs_admin`
 equivalent, #6). It relies on, and so these stay public

@@ -71,14 +71,14 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
       2026-10-06 (v0.2.1); `tests/cli_report.rs` holds the log lines to
       `mkfs.xfs -N`.
 - [ ] Overwrite hygiene: stale secondaries, discard — issue #5
-- [ ] `xfs_admin -U/-L` over `BlockDevice` for stormblock's clones — issue #6
-      (in progress 2026-10-06). `admin::set_uuid` = xfs_db `uuid_f`: refuse
-      NEEDSREPAIR / realtime / external log; find the log head and tail
-      (`libxlog` `xlog_find_tail`, userspace port), refuse a dirty log;
-      `libxfs_log_clear` at `l_curr_cycle + 1` with the new UUID (rewrites
-      the whole log, as xfs_admin does); then every AG's sb (`do_uuid`:
-      META_UUID on/off). `admin::set_label` = `label_f`/`do_label`. Held to
-      `xfs_admin` byte for byte in `tests/live_xfs_admin.rs`.
+- [x] `xfs_admin -U/-L` over `BlockDevice` for stormblock's clones — issue #6,
+      done 2026-10-06 (v0.3.0). `admin::set_uuid` = xfs_db `uuid_f`:
+      refuse NEEDSREPAIR / realtime / external log; `xlog_find_tail`
+      (libxlog port), refuse a dirty log; `libxfs_log_clear` at
+      `l_curr_cycle + 1` (the whole log, as xfs_admin does); every AG's sb
+      via `do_uuid` and xfs_db's sb round trip (quota inos 0 → NULLFSINO).
+      `set_label`, `restore_uuid`, `xfs-admin` binary. `tests/live_xfs_admin.rs`:
+      7 cases × 7 steps byte-identical to xfs_admin 6.15 on dev.
 - [x] Kernel verification in a throwaway VM via `stormcentral testhost boot`
       — issue #11, done 2026-10-06. `tests/vm/build-image.sh OUT` (sc-build
       with `SC_BUILD_OUT`) makes a GPT disk: ESP with the UEFI Shell,
