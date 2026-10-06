@@ -41,7 +41,7 @@ repair() { # image what
 }
 
 exercise() { # image name — mount rw, write, unmount, check, remount ro
-    img=$1; name=$2
+    local img=$1 name=$2 i sum
     mount -t xfs -o loop,rw "$img" /mnt 2>/work/err || fail "$name: mount: $(cat /work/err)"
     grep -q ' /mnt xfs rw' /proc/mounts || fail "$name: not mounted read-write"
     echo "hello from the kernel" > /mnt/probe.txt || fail "$name: write"

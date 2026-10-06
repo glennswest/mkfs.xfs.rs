@@ -120,10 +120,16 @@ nrext64 and sparse inodes, the AG count and log size its calculations give.
 | `tests/live_mkfs_xfs.rs` | Against the `mkfs.xfs` installed where the tests run (dev.g8.lo), 777 MB to 8 TiB: field-for-field equal, and `xfs_repair -n` clean. Skips where there is no xfsprogs. |
 | `tests/kernel-mount.sh` | A real kernel, in a VM, no root: `xfs_repair -n`, mount read-write, write a file, directories, 300 files and 4 MiB, unmount, remount, `xfs_repair -n` again — on our image and, as a control, on `mkfs.xfs`'s. Then `xfs-admin -U` over the log the kernel left: identical to `xfs_admin -U`, and the kernel mounts it again. |
 | `tests/live_xfs_admin.rs` | `admin` against the `xfs_admin` installed where the tests run: images made by `mkfs.xfs` (block sizes 1–8 KiB, 4 KiB sectors, log stripe units of 32 and 256 KiB, nine AGs) are changed step by step — labels, new UUIDs through log cycles 1 → 4, back to the metadata UUID, `restore` — and must be identical to `xfs_admin`'s byte for byte after every step; `xfs_repair -n` clean. |
+| `tests/vm/` | A real kernel through stormcentral's throwaway VMs (`testhost boot`), no root anywhere: `build-image.sh` (run by sc-build) makes a UEFI disk — the Shell starts the build box's kernel with a busybox initramfs holding the xfs and loop modules, `xfs_repair` and our `mkfs-xfs`/`xfs-admin`. Its init (`init.sh`) formats 8 cases (512 MB – 16 GiB, block sizes 1–16 KiB, 4 KiB sectors, 1 KiB inodes, minimal features), loop-mounts each read-write, writes, unmounts, `xfs_repair -n`, remounts and reads back; then `xfs-admin -U` and all of it again; then two clones of one blank — refused side by side with one UUID, both mounted after `xfs-admin -U`. Prints `VERIFY PASS` / `VERIFY FAIL <why>` on serial. |
 | `tests/device_io.rs` | Whole-block I/O on a device that enforces a 4 KiB sector; a 1 PiB format in memory. |
 
     sc-build                          # build and every Rust test
-    sc-build tests/kernel-mount.sh    # the kernel test
+    sc-build tests/kernel-mount.sh    # the kernel test, qemu on dev
+    SC_BUILD_OUT=tmp/xfs-verify.img SC_BUILD_OUT_TO=tmp/xfs-verify.img \
+      sc-build 'tests/vm/build-image.sh tmp/xfs-verify.img'
+    stormcentral testhost boot nanatest1 --image tmp/xfs-verify.img \
+      --expect 'VERIFY PASS' --fail 'VERIFY FAIL' --timeout 900 \
+      --url http://stormcentral.g8.lo       # the kernel test, throwaway VM
     cargo run --example compare -- ours.img theirs.img [--all]
     cargo run --example dump -- fs.img
 

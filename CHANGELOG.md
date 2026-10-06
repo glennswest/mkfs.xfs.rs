@@ -4,6 +4,13 @@
 <!-- New unreleased changes go here -->
 
 ### 2026-10-06
+- **test:** `tests/vm/` — kernel verification in a throwaway VM through
+  stormcentral's `testhost boot` (#11): `build-image.sh` makes a UEFI disk
+  (Shell → the build box's kernel + a busybox initramfs with xfs/loop
+  modules, xfs_repair and our binaries); `init.sh` formats 8 cases with
+  mkfs-xfs, loop-mounts, writes, checks with `xfs_repair -n` and remounts,
+  repeats after `xfs-admin -U`, and mounts two re-stamped clones of one
+  blank side by side; prints `VERIFY PASS` / `VERIFY FAIL <why>`.
 - **feat:** `admin::set_uuid`, `admin::restore_uuid` and `admin::set_label`
   — `xfs_admin -U` / `-U restore` / `-L` over `BlockDevice`, leaving the
   device byte for byte as xfsprogs 6.15's `xfs_db` does: a clean-log check

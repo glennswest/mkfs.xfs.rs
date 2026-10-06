@@ -79,15 +79,14 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
       the whole log, as xfs_admin does); then every AG's sb (`do_uuid`:
       META_UUID on/off). `admin::set_label` = `label_f`/`do_label`. Held to
       `xfs_admin` byte for byte in `tests/live_xfs_admin.rs`.
-- [ ] Kernel verification in a throwaway VM via `stormcentral testhost boot`
-      — issue #11 (in progress 2026-10-06). `tests/vm/build-image.sh OUT`
-      (run in sc-build with `SC_BUILD_OUT`) makes a GPT disk: ESP with the
-      UEFI Shell, `startup.nsh` → dev's kernel (EFI stub) + an initramfs of
-      busybox, xfs/loop modules, xfs_repair and our mkfs-xfs / xfs-admin.
-      Its init formats with our code, loop-mounts, writes, `xfs_repair -n`,
-      re-stamps with xfs-admin -U, mounts the two clones side by side, and
-      prints `VERIFY PASS` / `VERIFY FAIL <why>`. Boot:
-      `testhost boot nanatest1 --image tmp/xfs-verify.img --expect 'VERIFY PASS' --fail 'VERIFY FAIL'`.
+- [x] Kernel verification in a throwaway VM via `stormcentral testhost boot`
+      — issue #11, done 2026-10-06. `tests/vm/build-image.sh OUT` (sc-build
+      with `SC_BUILD_OUT`) makes a GPT disk: ESP with the UEFI Shell,
+      `startup.nsh` → dev's kernel (EFI stub) + a busybox initramfs with the
+      loop/xfs modules, xfs_repair and our mkfs-xfs / xfs-admin.
+      `tests/vm/init.sh` formats 8 cases, loop-mounts, writes, `xfs_repair
+      -n`, remounts; again after xfs-admin -U; two clones of one blank side
+      by side. First pass: nanatest1 run 7931c56f7e (kernel 7.2.8, 12 s).
 - [ ] Lazy formatting where XFS allows. Note: a format already writes only
       headers, roots, one inode chunk and the log (1 PiB: ~0.1 s in memory);
       what remains is the 2 GiB log zeroing on devices without write-zeroes.
@@ -102,6 +101,8 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
 - `sc-build` — unit tests, `tests/golden.rs`, `tests/live_mkfs_xfs.rs`
   (uses dev's mkfs.xfs/xfs_repair; skips elsewhere), `tests/live_xfs_admin.rs`
   (byte-identical to dev's xfs_admin), `tests/device_io.rs`.
+- `tests/vm/` — the same in a throwaway VM through `stormcentral testhost
+  boot nanatest1` (README "How it is held"); pass line `VERIFY PASS`.
 - `sc-build tests/kernel-mount.sh` — kernel mount/write/remount in qemu+KVM
   with the host kernel and an initramfs built from busybox and xfs.ko; no
   root. Runs each case on mkfs.xfs's image too, as a control.
