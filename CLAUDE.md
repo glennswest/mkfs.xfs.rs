@@ -69,6 +69,13 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
       `mkfs.xfs -N`.
 - [ ] Overwrite hygiene: stale secondaries, discard — issue #5
 - [ ] `xfs_admin -U/-L` over `BlockDevice` for stormblock's clones — issue #6
+      (in progress 2026-10-06). `admin::set_uuid` = xfs_db `uuid_f`: refuse
+      NEEDSREPAIR / realtime / external log; find the log head and tail
+      (`libxlog` `xlog_find_tail`, userspace port), refuse a dirty log;
+      `libxfs_log_clear` at `l_curr_cycle + 1` with the new UUID (rewrites
+      the whole log, as xfs_admin does); then every AG's sb (`do_uuid`:
+      META_UUID on/off). `admin::set_label` = `label_f`/`do_label`. Held to
+      `xfs_admin` byte for byte in `tests/live_xfs_admin.rs`.
 - [ ] Lazy formatting where XFS allows. Note: a format already writes only
       headers, roots, one inode chunk and the log (1 PiB: ~0.1 s in memory);
       what remains is the 2 GiB log zeroing on devices without write-zeroes.
