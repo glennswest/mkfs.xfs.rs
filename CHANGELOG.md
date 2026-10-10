@@ -3,6 +3,15 @@
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
+### 2026-10-10
+- **docs:** Rechecked README, CLAUDE.md and crate docs against the code
+  for everything since 2026-10-02 (v0.2.1, v0.3.0: `admin`/`xfs-admin`,
+  `tests/vm/`): CLI flags, `Params`, the stormblock API list, how it ships
+  (git tags, no service, ports or config) all match. Removed the
+  references to dev.g8.lo as where the tests run (retired 2026-10-07);
+  the live and kernel tests run on sc-build's build VM and skip where
+  xfsprogs is missing.
+
 ## [v0.3.0] — 2026-10-06
 
 ### Added

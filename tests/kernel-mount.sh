@@ -19,7 +19,7 @@
 # once on our image and once on real mkfs.xfs's, so a failure on both is
 # the environment's and a failure on ours alone is ours.
 #
-#   sc-build tests/kernel-mount.sh        (on dev.g8.lo)
+#   sc-build tests/kernel-mount.sh        (on a build VM)
 #   tests/kernel-mount.sh                 (anywhere with the tools)
 
 set -uo pipefail

@@ -1,5 +1,5 @@
 //! `admin::set_uuid` / `set_label` against the `xfs_admin` installed here,
-//! when there is one (dev.g8.lo has xfsprogs 6.15.0; elsewhere these tests
+//! when there is one (the build VM has xfsprogs; elsewhere these tests
 //! report a skip).
 //!
 //! Each case: real `mkfs.xfs` formats an image and it is copied. Then, step
