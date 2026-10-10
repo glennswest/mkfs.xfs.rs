@@ -1,5 +1,5 @@
 //! Against the `mkfs.xfs` and `xfs_repair` installed here, when there are
-//! any (the build VM has xfsprogs; elsewhere these tests report a skip).
+//! any (where there are none, these tests report a skip).
 //!
 //! For each case: real `mkfs.xfs` formats a sparse file, this crate formats
 //! another of the same size, the two are compared field by field, and

@@ -1,6 +1,5 @@
 //! `admin::set_uuid` / `set_label` against the `xfs_admin` installed here,
-//! when there is one (the build VM has xfsprogs; elsewhere these tests
-//! report a skip).
+//! when there is one (when there is none, these tests report a skip).
 //!
 //! Each case: real `mkfs.xfs` formats an image and it is copied. Then, step
 //! by step, `xfs_admin` changes one copy and this crate the other, and the

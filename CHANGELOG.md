@@ -10,7 +10,8 @@
   (git tags, no service, ports or config) all match. Removed the
   references to dev.g8.lo as where the tests run (retired 2026-10-07);
   the live and kernel tests run on sc-build's build VM and skip where
-  xfsprogs is missing.
+  xfsprogs is missing (that the buildbox2 template has xfsprogs 6.15 and
+  /dev/kvm is not yet confirmed: a probe build got no slot in 30 min).
 
 ## [v0.3.0] — 2026-10-06
 
