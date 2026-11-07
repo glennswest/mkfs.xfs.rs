@@ -92,6 +92,9 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
       headers, roots, one inode chunk and the log (1 PiB: ~0.1 s in memory);
       what remains is the 2 GiB log zeroing on devices without write-zeroes.
 - [x] Comparison tool vs real mkfs.xfs and golden tests
+- [ ] Confirm live/kernel tests run on sc-build's build VM — issue #12
+- [ ] Re-capture goldens against xfsprogs 6.19.0 (new defaults in 6.18, log
+      sunit fix in 6.19) — issue #13; until then goldens are 6.15.0
 - [ ] Checker (an `xfs_repair -n` subset): structural validation — build it
       on `inspect` — issue #7
 - [ ] Large sizes measured on stormcos's emulated large drives (layout at

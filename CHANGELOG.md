@@ -3,6 +3,13 @@
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
+### 2026-11-07
+- **docs:** Refreshed docs against the code since 2026-10-16: the only
+  commit is a research note (#628), no code changed, so README and crate
+  docs already match. CLAUDE.md work plan now lists open issues #12 (confirm
+  live/kernel tests on the build VM) and #13 (re-capture goldens for
+  xfsprogs 6.19.0).
+
 ### 2026-10-10
 - **docs:** Rechecked README, CLAUDE.md and crate docs against the code
   for everything since 2026-10-02 (v0.2.1, v0.3.0: `admin`/`xfs-admin`,
