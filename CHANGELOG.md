@@ -3,6 +3,13 @@
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
+### 2026-11-14
+- **docs:** Rechecked docs against the code since 2026-11-07: the only
+  commit is a research note (#628); no code changed, so README, CLAUDE.md
+  and crate docs still match. No design document exists. No new promise
+  the code breaks; open issues #2-#5, #7, #8, #12, #13 already cover the
+  gaps. #13 note: xfsprogs is past 6.19.0 (7.x), consider the newest.
+
 ### 2026-11-07
 - **docs:** Refreshed docs against the code since 2026-10-16: the only
   commit is a research note (#628), no code changed, so README and crate
