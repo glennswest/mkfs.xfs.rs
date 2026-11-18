@@ -393,8 +393,7 @@ impl Geometry {
         // validate_inodesize
         let inodesize = params.inode_size.unwrap_or(512);
         if !inodesize.is_power_of_two()
-            || inodesize < 512
-            || inodesize > DINODE_MAX_SIZE
+            || !(512..=DINODE_MAX_SIZE).contains(&inodesize)
             || inodesize > blocksize / 2
         {
             return Err(Error::InvalidParams(format!(

@@ -10,6 +10,8 @@
   a later calculation. The geometry docs and README's limits say the
   minimum log size is refused, with #2 tracking it, instead of calling it
   a stub. No stub marker remains in code or docs.
+- **fix:** clippy `manual_range_contains` in the inode size check (#18),
+  raised by the build VM's newer clippy; same check, no behaviour change.
 
 ### 2026-11-14
 - **docs:** Rechecked docs against the code since 2026-11-07: the only
