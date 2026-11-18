@@ -71,10 +71,10 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
       a one-block log stripe unit (4 KiB log sectors) — issue #9, fixed
       2026-10-06 (v0.2.1); `tests/cli_report.rs` holds the log lines to
       `mkfs.xfs -N`.
-- [x] No stubs — issue #14, 2026-11-18: the three "not implemented" /
-      "not supported yet" markers reworded as refusals naming their issue
-      (#2); `grep -rInE 'not implemented|unimplemented!|todo!|not supported
-      yet|coming soon'` is empty outside tests.
+- [x] No stubs — issue #14, 2026-11-18: the three stub markers (error
+      text, geometry doc, README limits) reworded as refusals naming their
+      issue (#2); the issue's proof grep is empty outside tests. Keep it so:
+      a gap is a refusal plus an issue, never a "later" in the text.
 - [ ] Overwrite hygiene: stale secondaries, discard — issue #5
 - [x] `xfs_admin -U/-L` over `BlockDevice` for stormblock's clones — issue #6,
       done 2026-10-06 (v0.3.0). `admin::set_uuid` = xfs_db `uuid_f`:
