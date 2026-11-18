@@ -30,9 +30,10 @@ pub enum Error {
     #[error("invalid parameters: {0}")]
     InvalidParams(String),
 
-    /// A configuration `mkfs.xfs` accepts but this implementation does not
-    /// yet reproduce exactly. Refused rather than approximated.
-    #[error("not supported yet: {0}")]
+    /// A configuration `mkfs.xfs` accepts that this crate refuses because it
+    /// cannot reproduce it exactly. Refused rather than approximated; each
+    /// such gap is an open issue on the repository (README "Limits").
+    #[error("unsupported configuration (refused, not approximated): {0}")]
     Unsupported(String),
 
     /// What was read is not an XFS filesystem, or not one this crate reads.

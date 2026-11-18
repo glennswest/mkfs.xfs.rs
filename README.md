@@ -110,7 +110,8 @@ nrext64 and sparse inodes, the AG count and log size its calculations give.
 - **Refused, not approximated:** filesystems under 300 MB (which `mkfs.xfs`
   also refuses) and block sizes over 16 KiB. Both are where `mkfs.xfs` sizes
   the log from the minimum log size, which is the whole transaction
-  reservation table and not implemented here (#2).
+  reservation table; this crate does not compute it, so it refuses those
+  configurations with `Error::Unsupported` (#2 tracks adding it).
 
 ## How it is held to `mkfs.xfs`
 

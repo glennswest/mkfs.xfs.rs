@@ -3,6 +3,14 @@
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
+### 2026-11-18
+- **fix:** No stubs (#14): `Error::Unsupported` now displays as
+  "unsupported configuration (refused, not approximated): …" instead of
+  "not supported yet: …", and the block-size refusal names #2 instead of
+  "does not calculate yet". The geometry docs and README's limits say the
+  minimum log size is refused, with #2 tracking it, instead of "not
+  implemented". Nothing answers or documents "not implemented".
+
 ### 2026-11-14
 - **docs:** Rechecked docs against the code since 2026-11-07: the only
   commit is a research note (#628); no code changed, so README, CLAUDE.md

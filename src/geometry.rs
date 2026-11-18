@@ -4,8 +4,8 @@
 //!
 //! Each calculation names the xfsprogs function it reproduces (xfsprogs
 //! 6.15.0, `mkfs/xfs_mkfs.c` unless noted). Where `mkfs.xfs` would need a
-//! calculation this crate does not have yet — the minimum log size, which
-//! is the whole transaction-reservation table — the configuration is refused
+//! calculation outside this crate — the minimum log size, which is the
+//! whole transaction-reservation table (#2) — the configuration is refused
 //! with [`Error::Unsupported`] rather than approximated.
 
 use crate::error::{Error, Result};
@@ -15,8 +15,9 @@ pub const MIN_CRC_BLOCKSIZE: u32 = 1024;
 /// `XFS_MAX_BLOCKSIZE`.
 pub const MAX_BLOCKSIZE: u32 = 65536;
 /// Largest block size whose default log this crate can size exactly: above
-/// it the minimum log size (not implemented) exceeds the 64 MiB realistic
-/// floor, and `mkfs.xfs` uses the minimum instead.
+/// it the minimum log size exceeds the 64 MiB realistic floor and
+/// `mkfs.xfs` uses the minimum instead, which this crate does not compute
+/// (#2), so larger block sizes are refused.
 pub const MAX_SUPPORTED_BLOCKSIZE: u32 = 16384;
 /// `XFS_MIN_SECTORSIZE`.
 pub const MIN_SECTORSIZE: u32 = 512;
@@ -350,7 +351,7 @@ impl Geometry {
         if blocksize > MAX_SUPPORTED_BLOCKSIZE {
             return Err(Error::Unsupported(format!(
                 "block size {blocksize}: mkfs.xfs sizes its log from the minimum log size \
-                 there, which this crate does not calculate yet"
+                 there, which this crate does not compute (#2)"
             )));
         }
         let blocklog = pow2_log(blocksize);
@@ -552,7 +553,7 @@ impl Geometry {
     fn calculate_log_size(&mut self) -> Result<()> {
         let blocklog = self.blocklog;
         // The minimum log size needs the transaction reservation table,
-        // which this crate does not have. It only decides the size for a
+        // which this crate does not compute (#2). It only decides the size for a
         // filesystem under 300 MB, refused below, or where it exceeds the
         // 64 MiB realistic floor — block sizes over 16 KiB, refused above.
         if self.dblocks < (300 * MIB) >> blocklog {
