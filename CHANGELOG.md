@@ -3,14 +3,16 @@
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
-### 2026-11-18
-- **fix:** No stubs (#14): `Error::Unsupported` now displays as
+## [v0.3.1] — 2026-11-18
+
+### Fixed
+- No stubs (#14): `Error::Unsupported` now displays as
   "unsupported configuration (refused, not approximated): …" instead of a
   "yet" message, and the block-size refusal names #2 instead of promising
   a later calculation. The geometry docs and README's limits say the
   minimum log size is refused, with #2 tracking it, instead of calling it
   a stub. No stub marker remains in code or docs.
-- **fix:** clippy `manual_range_contains` in the inode size check (#18),
+- clippy `manual_range_contains` in the inode size check (#18),
   raised by the build VM's newer clippy; same check, no behaviour change.
 
 ### 2026-11-14
