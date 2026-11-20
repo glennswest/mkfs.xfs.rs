@@ -88,9 +88,19 @@ pub struct FileDevice {
 impl FileDevice {
     /// Open an existing file or block device.
     pub async fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::open_with(path, true).await
+    }
+
+    /// Open an existing file or block device for reading only, to learn its
+    /// size and sector sizes (`mkfs-xfs -N`). Writes to it fail.
+    pub async fn open_read_only(path: impl AsRef<Path>) -> Result<Self> {
+        Self::open_with(path, false).await
+    }
+
+    async fn open_with(path: impl AsRef<Path>, write: bool) -> Result<Self> {
         let path = path.as_ref().to_path_buf();
         let file = tokio::task::spawn_blocking(move || {
-            std::fs::OpenOptions::new().read(true).write(true).open(path)
+            std::fs::OpenOptions::new().read(true).write(write).open(path)
         })
         .await
         .map_err(|e| Error::io(0, io::Error::other(e)))?

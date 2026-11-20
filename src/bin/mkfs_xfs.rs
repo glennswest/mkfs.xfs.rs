@@ -61,6 +61,13 @@ fn parse_size(s: &str) -> Result<u64> {
     n.checked_mul(1 << shift).with_context(|| format!("size {s:?} overflows"))
 }
 
+/// A size that must fit a u32 (block, sector, inode size): refused, never
+/// wrapped, when it does not.
+fn parse_size_u32(opt: &str, s: &str) -> Result<u32> {
+    let n = parse_size(s)?;
+    u32::try_from(n).with_context(|| format!("{opt} size={s}: {n} does not fit 32 bits"))
+}
+
 fn parse_bool(s: &str) -> Result<bool> {
     match s {
         "1" => Ok(true),
@@ -88,13 +95,13 @@ fn params(cli: &Cli) -> Result<Params> {
     let mut p = Params::new();
     for (k, v) in subopts(&cli.block) {
         match k.as_str() {
-            "size" => p.block_size = Some(parse_size(&v)? as u32),
+            "size" => p.block_size = Some(parse_size_u32("-b", &v)?),
             _ => bail!("unknown -b option {k}"),
         }
     }
     for (k, v) in subopts(&cli.sector) {
         match k.as_str() {
-            "size" => p.sector_size = Some(parse_size(&v)? as u32),
+            "size" => p.sector_size = Some(parse_size_u32("-s", &v)?),
             _ => bail!("unknown -s option {k}"),
         }
     }
@@ -108,7 +115,7 @@ fn params(cli: &Cli) -> Result<Params> {
     }
     for (k, v) in subopts(&cli.inode) {
         match k.as_str() {
-            "size" => p.inode_size = Some(parse_size(&v)? as u32),
+            "size" => p.inode_size = Some(parse_size_u32("-i", &v)?),
             "maxpct" => p.imaxpct = Some(v.parse()?),
             "sparse" => p.features.sparse = parse_bool(&v)?,
             "nrext64" => p.features.nrext64 = parse_bool(&v)?,
@@ -170,19 +177,33 @@ fn report(g: &Geometry, name: &str) {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    use mkfs_xfs::device::BlockDevice;
     let cli = Cli::parse();
     let _ = cli.force;
     let p = params(&cli)?;
-    let dev = match &cli.create {
-        Some(size) => FileDevice::create(&cli.device, parse_size(size)?).await?,
-        None => FileDevice::open(&cli.device).await?,
-    };
+    // A file made by --create has a plain file's sector sizes (FileDevice::create).
+    let create = cli.create.as_deref().map(parse_size).transpose()?;
     if cli.dry_run {
-        use mkfs_xfs::device::BlockDevice;
-        let g = Geometry::compute(&p, dev.size(), dev.logical_sector_size(), dev.physical_sector_size())?;
+        // -N writes nothing: with --create the file is neither made nor
+        // truncated, and an existing target is opened read-only.
+        let g = match create {
+            Some(size) => Geometry::compute(&p, size, 512, 512)?,
+            None => {
+                let dev = FileDevice::open_read_only(&cli.device).await?;
+                Geometry::compute(&p, dev.size(), dev.logical_sector_size(), dev.physical_sector_size())?
+            }
+        };
         report(&g, &cli.device);
         return Ok(());
     }
+    let dev = match create {
+        Some(size) => {
+            // Refuse bad parameters before truncating anything.
+            Geometry::compute(&p, size, 512, 512)?;
+            FileDevice::create(&cli.device, size).await?
+        }
+        None => FileDevice::open(&cli.device).await?,
+    };
     let r = format(&dev, &p).await?;
     if !cli.quiet {
         report(&r.geometry, &cli.device);

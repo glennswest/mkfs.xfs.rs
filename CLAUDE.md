@@ -75,6 +75,9 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
       text, geometry doc, README limits) reworded as refusals naming their
       issue (#2); the issue's proof grep is empty outside tests. Keep it so:
       a gap is a refusal plus an issue, never a "later" in the text.
+- [x] CLI safety review — issue #19, 2026-11-20: `-N --create` truncated
+      the target; `--create` truncated before geometry checks; `-b/-s/-i`
+      sizes wrapped to u32. Fixed; `tests/cli_safety.rs`.
 - [ ] Overwrite hygiene: stale secondaries, discard — issue #5
 - [x] `xfs_admin -U/-L` over `BlockDevice` for stormblock's clones — issue #6,
       done 2026-10-06 (v0.3.0). `admin::set_uuid` = xfs_db `uuid_f`:

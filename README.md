@@ -55,10 +55,14 @@ The CLI takes `mkfs.xfs`'s option syntax for what it supports:
 
 `-N` prints the geometry and writes nothing, in mkfs.xfs's layout (its
 log lines match `mkfs.xfs -N`'s, including the one-block log `sunit` that a
-log sector over 512 bytes gets); `-f` is accepted and ignored
+log sector over 512 bytes gets): the target is opened read-only, and with
+`--create` it is neither made nor truncated (the geometry is that of a
+plain file of SIZE); `-f` is accepted and ignored
 (an existing filesystem is never refused); `-m crc=1` is accepted, anything
 else not listed is an error. `--create SIZE` makes a sparse image file of
-that size first. Sizes take `k`/`m`/`g`/`t`/`p` (binary) suffixes. Install
+that size first, once the requested geometry has been checked (bad
+parameters leave an existing file untouched). `-b`, `-s` and `-i` sizes
+that do not fit 32 bits are refused. Sizes take `k`/`m`/`g`/`t`/`p` (binary) suffixes. Install
 the binary as `mkfs.xfs` if `mkfs -t xfs` should find it.
 
 ## A new UUID or label: `admin`, `xfs-admin`

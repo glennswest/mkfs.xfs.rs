@@ -3,6 +3,17 @@
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
+### 2026-11-20
+- **fix:** `mkfs-xfs -N --create SIZE` no longer truncates an existing file
+  (it neither creates nor opens it: the geometry is computed from SIZE),
+  and `-N` opens an existing target read-only (#19, findings 706e2b7cf06c,
+  1780bbcd6dfa). A real `--create` checks the geometry before truncating,
+  so refused parameters leave the file as it was.
+- **fix:** `-b`/`-s`/`-i size=` values over 32 bits are refused instead of
+  wrapping (4294971392 became 4096) (#19, finding d8ad2d03becd).
+- **feat:** `FileDevice::open_read_only` (used by `-N`).
+- **test:** `tests/cli_safety.rs` holds all three.
+
 ## [v0.3.1] — 2026-11-18
 
 ### Fixed
