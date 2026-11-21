@@ -90,6 +90,9 @@ These leave the device byte for byte as `xfs_admin` 6.15 leaves it (the
   written.
 - Every AG's superblock is rewritten as `xfs_db` rewrites it, which also
   turns quota inode fields of 0 into `NULLFSINO`.
+- Every superblock's magic and CRC are checked before anything is
+  written; a bad one is refused (`Error::Corrupt`) with the device as it
+  was.
 - Refused: a filesystem marked `NEEDSREPAIR`, an external log, a realtime
   device, unknown incompat features.
 
