@@ -3,28 +3,26 @@
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
-### 2026-11-20
-- **fix:** `inspect::geometry` (so `dump`, `compare` and `admin`) returns
-  `NotXfs`/`Corrupt` for a malformed superblock instead of panicking: a
-  head shorter than the superblock is refused before any field is read;
-  `blocklog`, `agblklog` and `inopblog` are range-checked before any shift;
-  inode size × inodes per block must equal the block size; the last AG
-  must hold at least one block; an internal log must lie inside its AG
-  (#20, findings 90d4720e1301, 6add0f6e5a3a).
-- **fix:** the btree walk in `inspect::dump` refuses a block reached twice
-  (a cycle, or a shared child) and a child whose level is not one below
-  its parent's, so a crafted image can no longer blow up memory; each tree
-  is bounded by its AG's size (#20, finding 7a04f03be49f). Unit tests in
-  `src/inspect.rs` cover all three.
-- **fix:** `mkfs-xfs -N --create SIZE` no longer truncates an existing file
-  (it neither creates nor opens it: the geometry is computed from SIZE),
-  and `-N` opens an existing target read-only (#19, findings 706e2b7cf06c,
-  1780bbcd6dfa). A real `--create` checks the geometry before truncating,
-  so refused parameters leave the file as it was.
-- **fix:** `-b`/`-s`/`-i size=` values over 32 bits are refused instead of
-  wrapping (4294971392 became 4096) (#19, finding d8ad2d03becd).
-- **feat:** `FileDevice::open_read_only` (used by `-N`).
-- **test:** `tests/cli_safety.rs` holds all three.
+## [v0.4.0] — 2026-11-21
+
+### Added
+- `FileDevice::open_read_only`, used by `mkfs-xfs -N` (#19).
+
+### Fixed
+- `mkfs-xfs -N --create SIZE` no longer creates or truncates the target;
+  `-N` opens an existing target read-only; a real `--create` checks the
+  geometry before truncating (#19, findings 706e2b7cf06c, 1780bbcd6dfa).
+- `-b`/`-s`/`-i size=` values over 32 bits are refused instead of
+  wrapping (#19, finding d8ad2d03becd). `tests/cli_safety.rs`.
+- `inspect::geometry` (so `dump`, `compare`, `admin`) returns
+  `NotXfs`/`Corrupt` for a malformed or truncated superblock instead of
+  panicking: whole superblock required, `blocklog`/`agblklog`/`inopblog`
+  range-checked before shifting, inode/block sizes, the last AG and the
+  internal log checked (#20, findings 90d4720e1301, 6add0f6e5a3a).
+- The btree walk in `inspect::dump` refuses a block reached twice and a
+  child whose level is not one below its parent's, so a crafted image can
+  no longer exhaust memory (#20, finding 7a04f03be49f). Unit tests in
+  `src/inspect.rs`.
 
 ## [v0.3.1] — 2026-11-18
 
