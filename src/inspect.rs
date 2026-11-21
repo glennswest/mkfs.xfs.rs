@@ -123,10 +123,19 @@ pub struct Geo {
 }
 
 impl Geo {
+    /// Every field used to find the rest of the filesystem is checked here,
+    /// before anything shifts or slices by it: a malformed or truncated
+    /// superblock is `NotXfs` or `Corrupt`, never a panic.
     fn parse(b: &[u8]) -> Result<Geo> {
         use sb::off::*;
-        if be32(b, MAGICNUM) != sb::MAGIC {
+        if b.len() < 4 || be32(b, MAGICNUM) != sb::MAGIC {
             return Err(Error::NotXfs("no XFSB magic at byte 0".into()));
+        }
+        if b.len() < END {
+            return Err(Error::Corrupt(format!(
+                "superblock truncated: {} of {END} bytes",
+                b.len()
+            )));
         }
         if be16(b, VERSIONNUM) & 0xf != 5 {
             return Err(Error::NotXfs("not a v5 (CRC) superblock".into()));
@@ -148,23 +157,46 @@ impl Geo {
             ro_compat: be32(b, FEATURES_RO_COMPAT),
             incompat: be32(b, FEATURES_INCOMPAT),
         };
-        let ok = g.blocksize.is_power_of_two()
-            && (512..=65536).contains(&g.blocksize)
-            && 1u64 << g.blocklog == g.blocksize
-            && g.sectsize.is_power_of_two()
-            && (512..=32768).contains(&g.sectsize)
-            && g.sectsize <= g.blocksize
-            && g.inodesize.is_power_of_two()
-            && (256..=2048).contains(&g.inodesize)
-            && g.agcount > 0
-            && g.agblocks > 0
-            && g.agblocks <= 1u64 << g.agblklog
-            && g.agblklog < 32
-            && g.dblocks <= g.agcount * g.agblocks;
-        if !ok {
-            return Err(Error::Corrupt("superblock geometry".into()));
-        }
+        g.check().map_err(|what| Error::Corrupt(format!("superblock geometry: {what}")))?;
         Ok(g)
+    }
+
+    /// The geometry's consistency, logarithms range-checked before any
+    /// shift. Returns what is wrong.
+    fn check(&self) -> std::result::Result<(), &'static str> {
+        let ensure = |ok: bool, what: &'static str| if ok { Ok(()) } else { Err(what) };
+        ensure((9..=16).contains(&self.blocklog), "blocklog out of range")?;
+        ensure(1u64 << self.blocklog == self.blocksize, "blocksize is not 2^blocklog")?;
+        ensure(
+            self.sectsize.is_power_of_two() && (512..=32768).contains(&self.sectsize),
+            "sectsize",
+        )?;
+        ensure(self.sectsize <= self.blocksize, "sectsize over blocksize")?;
+        ensure(
+            self.inodesize.is_power_of_two() && (256..=2048).contains(&self.inodesize),
+            "inodesize",
+        )?;
+        ensure(self.inopblog <= self.blocklog - 8, "inopblog out of range")?;
+        ensure(self.inodesize << self.inopblog == self.blocksize, "inodesize * 2^inopblog is not blocksize")?;
+        ensure(self.agcount > 0 && self.agblocks > 0, "empty AG geometry")?;
+        ensure(self.agblklog < 32, "agblklog out of range")?;
+        ensure(self.agblocks <= 1u64 << self.agblklog, "agblocks over 2^agblklog")?;
+        // Inode numbers are agno << (agblklog + inopblog) | agino, in 64 bits.
+        let ino_shift = self.agblklog + self.inopblog;
+        ensure((self.agcount - 1) >> (64 - ino_shift) == 0, "agcount overflows inode numbers")?;
+        // The last AG holds at least one block and at most agblocks.
+        ensure(self.dblocks > (self.agcount - 1) * self.agblocks, "dblocks leaves the last AG empty")?;
+        ensure(self.dblocks <= self.agcount * self.agblocks, "dblocks over agcount * agblocks")?;
+        ensure(self.dblocks <= u64::MAX >> self.blocklog, "dblocks overflows a byte offset")?;
+        if self.logstart != 0 {
+            // An internal log lies inside one AG.
+            let ag = self.logstart >> self.agblklog;
+            let agbno = self.logstart & ((1u64 << self.agblklog) - 1);
+            ensure(ag < self.agcount, "logstart outside the filesystem")?;
+            ensure(self.logblocks > 0, "internal log of no blocks")?;
+            ensure(agbno + self.logblocks <= self.ag_len(ag), "log runs out of its AG")?;
+        }
+        Ok(())
     }
 
     fn byte(&self, agno: u64, agbno: u64) -> u64 {
@@ -385,6 +417,13 @@ async fn dump_tree<D: BlockDevice + ?Sized>(
     let mut level_blocks = vec![root];
     let mut leaves = Vec::new();
     let mut depth = 0;
+    // Every block is visited once: a pointer back to a block already
+    // queued (a cycle, or two parents of one child) is corruption, so the
+    // walk is bounded by the AG's size, not by what the pointers say.
+    let mut seen = std::collections::HashSet::from([root]);
+    // The level each block at this depth must have: the root's, then one
+    // less per depth down to the leaves.
+    let mut want_level: Option<u16> = None;
     while !level_blocks.is_empty() {
         let mut next = Vec::new();
         for (i, &agbno) in level_blocks.iter().enumerate() {
@@ -401,6 +440,16 @@ async fn dump_tree<D: BlockDevice + ?Sized>(
                 continue;
             }
             let level = be16(&b, off::LEVEL);
+            match want_level {
+                None if level > 16 => {
+                    return Err(Error::Corrupt(format!("{bp}: level {level} is deeper than any real btree")));
+                }
+                None => want_level = Some(level),
+                Some(w) if w != level => {
+                    return Err(Error::Corrupt(format!("{bp}: level {level} where its parent's child is {w}")));
+                }
+                Some(_) => {}
+            }
             let n = be16(&b, off::NUMRECS) as usize;
             d.s(format!("{bp}.level"), level);
             d.s(format!("{bp}.numrecs"), n);
@@ -429,11 +478,17 @@ async fn dump_tree<D: BlockDevice + ?Sized>(
                     let ptr = be32(&b, off::RECS + maxrecs * t.key + 4 * r);
                     d.s(format!("{bp}.key[{r}]"), hex_trimmed_full(&b[k..k + t.key]));
                     d.s(format!("{bp}.ptr[{r}]"), ptr);
+                    if !seen.insert(u64::from(ptr)) {
+                        return Err(Error::Corrupt(format!("{bp}.ptr[{r}] = {ptr} is reached twice")));
+                    }
                     next.push(u64::from(ptr));
                 }
             }
         }
         level_blocks = next;
+        // Only a block above level 0 queues children, so a level of 0 here
+        // means the walk is done.
+        want_level = want_level.map(|w| w.saturating_sub(1));
         depth += 1;
         if depth > 16 {
             return Err(Error::Corrupt(format!("{p} is deeper than any real btree")));
@@ -594,4 +649,182 @@ pub async fn dump<D: BlockDevice + ?Sized>(dev: &D) -> Result<Dump> {
     }
     d.s("log.nonzero_blocks_after_first_record".into(), nonzero);
     Ok(d)
+}
+
+#[cfg(test)]
+mod tests {
+    //! Malformed input is an error, never a panic or an unbounded walk
+    //! (issue #20).
+    use super::*;
+    use crate::device::MemDevice;
+    use crate::format::format;
+    use crate::geometry::Params;
+
+    const GIB: u64 = 1 << 30;
+
+    async fn fresh() -> MemDevice {
+        let dev = MemDevice::new(GIB);
+        format(&dev, &Params::new()).await.unwrap();
+        dev
+    }
+
+    async fn primary_sb(dev: &MemDevice) -> Vec<u8> {
+        read(dev, 0, 512).await.unwrap()
+    }
+
+    fn corrupt(r: Result<Geo>) -> String {
+        match r {
+            Err(Error::Corrupt(m)) => m,
+            other => panic!("expected Corrupt, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn fresh_superblock_parses() {
+        let g = Geo::parse(&primary_sb(&fresh().await).await).unwrap();
+        assert_eq!(g.blocksize, 4096);
+        assert_eq!(g.inodesize << g.inopblog, g.blocksize);
+    }
+
+    /// Finding 90d4720e1301 / 6add0f6e5a3a: short reads are refused before
+    /// any field is read.
+    #[tokio::test]
+    async fn short_and_empty_heads_are_errors() {
+        assert!(matches!(Geo::parse(&[]), Err(Error::NotXfs(_))));
+        assert!(matches!(Geo::parse(b"XF"), Err(Error::NotXfs(_))));
+        let sb = primary_sb(&fresh().await).await;
+        for len in [4, 100, sb::off::END - 1] {
+            assert!(corrupt(Geo::parse(&sb[..len])).contains("truncated"), "{len}");
+        }
+        // Through the public reader: an empty device, and one shorter than
+        // a superblock that starts with the magic.
+        let empty = MemDevice::new(0);
+        assert!(matches!(geometry(&empty).await, Err(Error::NotXfs(_))));
+        let short = MemDevice::new(100);
+        short.write_at(0, &sb[..100]).await.unwrap();
+        assert!(matches!(geometry(&short).await, Err(Error::Corrupt(_))));
+    }
+
+    /// Finding 6add0f6e5a3a: shift counts are range-checked first.
+    #[tokio::test]
+    async fn bad_logarithms_are_corrupt() {
+        use sb::off::*;
+        let sb = primary_sb(&fresh().await).await;
+        let cases = [
+            (BLOCKLOG, 64u8),
+            (BLOCKLOG, 255),
+            (BLOCKLOG, 11),
+            (AGBLKLOG, 64),
+            (AGBLKLOG, 200),
+            (AGBLKLOG, 32),
+            (INOPBLOG, 20),
+            (INOPBLOG, 2),
+        ];
+        for (o, v) in cases {
+            let mut b = sb.clone();
+            b[o] = v;
+            corrupt(Geo::parse(&b));
+        }
+    }
+
+    /// Finding 90d4720e1301: inode/block sizes, the last AG's bounds and
+    /// the internal log are consistent before `Geo` is exposed.
+    #[tokio::test]
+    async fn inconsistent_sizes_are_corrupt() {
+        use sb::off::*;
+        let sb = primary_sb(&fresh().await).await;
+        let g = Geo::parse(&sb).unwrap();
+        // (what, offset, width in bytes, value)
+        let cases: [(&str, usize, u8, u64); 8] = [
+            ("inodesize vs inopblog", INODESIZE, 2, 1024),
+            ("inodesize not a power of two", INODESIZE, 2, 300),
+            ("last AG empty", DBLOCKS, 8, (g.agcount - 1) * g.agblocks),
+            ("dblocks over agcount * agblocks", DBLOCKS, 8, g.agcount * g.agblocks + 1),
+            ("agcount 0", AGCOUNT, 4, 0),
+            ("log outside the filesystem", LOGSTART, 8, g.agcount << g.agblklog),
+            ("log runs out of its AG", LOGBLOCKS, 4, u64::from(u32::MAX)),
+            ("blocksize vs blocklog", BLOCKSIZE, 4, 8192),
+        ];
+        for (what, o, width, v) in cases {
+            let mut b = sb.clone();
+            match width {
+                2 => put16(&mut b, o, v as u16),
+                4 => put32(&mut b, o, v as u32),
+                _ => put64(&mut b, o, v),
+            }
+            assert!(matches!(Geo::parse(&b), Err(Error::Corrupt(_))), "{what}");
+        }
+    }
+
+    /// The bnobt root of AG 0 and its block.
+    async fn bno_root(dev: &MemDevice) -> (u64, Vec<u8>) {
+        let agf_b = read(dev, 512, 512).await.unwrap();
+        let root = u64::from(be32(&agf_b, agf::BNO_ROOT));
+        (root, read(dev, root * 4096, 4096).await.unwrap())
+    }
+
+    /// Finding 7a04f03be49f: an internal node whose every pointer is
+    /// itself is refused at once, not walked to exhaustion.
+    #[tokio::test]
+    async fn self_referencing_btree_is_corrupt() {
+        use btree::off;
+        let dev = fresh().await;
+        let (root, mut b) = bno_root(&dev).await;
+        let maxrecs = (b.len() - off::RECS) / (BNOBT.key + 4);
+        put16(&mut b, off::LEVEL, 1);
+        put16(&mut b, off::NUMRECS, maxrecs as u16);
+        for r in 0..maxrecs {
+            put32(&mut b, off::RECS + maxrecs * BNOBT.key + 4 * r, root as u32);
+        }
+        dev.write_at(root * 4096, &b).await.unwrap();
+        let t = std::time::Instant::now();
+        let err = dump(&dev).await.unwrap_err();
+        assert!(matches!(err, Error::Corrupt(ref m) if m.contains("reached twice")), "{err:?}");
+        assert!(t.elapsed() < std::time::Duration::from_secs(10));
+    }
+
+    /// Two pointers to one child are refused too.
+    #[tokio::test]
+    async fn shared_child_is_corrupt() {
+        use btree::off;
+        let dev = fresh().await;
+        let (root, leaf) = bno_root(&dev).await;
+        let child = 5000u64;
+        dev.write_at(child * 4096, &leaf).await.unwrap();
+        let mut b = leaf.clone();
+        let maxrecs = (b.len() - off::RECS) / (BNOBT.key + 4);
+        put16(&mut b, off::LEVEL, 1);
+        put16(&mut b, off::NUMRECS, 2);
+        for r in 0..2 {
+            put32(&mut b, off::RECS + maxrecs * BNOBT.key + 4 * r, child as u32);
+        }
+        dev.write_at(root * 4096, &b).await.unwrap();
+        let err = dump(&dev).await.unwrap_err();
+        assert!(matches!(err, Error::Corrupt(ref m) if m.contains("reached twice")), "{err:?}");
+    }
+
+    /// A child whose level is not one below its parent's is refused.
+    #[tokio::test]
+    async fn level_skip_is_corrupt() {
+        use btree::off;
+        let dev = fresh().await;
+        let (root, leaf) = bno_root(&dev).await;
+        let child = 5000u64;
+        dev.write_at(child * 4096, &leaf).await.unwrap();
+        let mut b = leaf.clone();
+        let maxrecs = (b.len() - off::RECS) / (BNOBT.key + 4);
+        put16(&mut b, off::LEVEL, 2);
+        put16(&mut b, off::NUMRECS, 1);
+        put32(&mut b, off::RECS + maxrecs * BNOBT.key, child as u32);
+        dev.write_at(root * 4096, &b).await.unwrap();
+        let err = dump(&dev).await.unwrap_err();
+        assert!(matches!(err, Error::Corrupt(ref m) if m.contains("level 0")), "{err:?}");
+    }
+
+    /// An untouched filesystem still dumps.
+    #[tokio::test]
+    async fn fresh_filesystem_dumps() {
+        let d = dump(&fresh().await).await.unwrap();
+        assert_eq!(d.get("ag[0].bnobt.l0[0].level"), Some("0"));
+    }
 }
