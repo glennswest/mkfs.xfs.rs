@@ -29,7 +29,7 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
 
 | Module | What it owns |
 |---|---|
-| `device` | async `BlockDevice` (`&self` reads and writes); `FileDevice`; sparse `MemDevice` (and `strict`, which refuses sub-sector I/O) |
+| `device` | async `BlockDevice` (`&self` reads and writes); `FileDevice` (I/O on tokio's blocking pool); sparse `MemDevice` (and `strict`, which refuses sub-sector I/O) |
 | `geometry` | `Params` (the mkfs.xfs command line) → `Geometry`: block/sector/inode sizes, AG count/size (`calc_default_ag_geometry`), log size and place (`calculate_log_size`), fixed per-AG block positions, root inode location |
 | `structs` | byte-exact encoders with named field offsets: `sb`, `ag` (AGF/AGI/AGFL), `btree` (short-form v5 blocks and records), `inode` (v3 dinode, short-form dir), `log` (first record + unmount record) |
 | `format` | `plan_ag` computes each AG's end state (free extents, AGFL, rmap records, root chunk); `format` writes it, AGs in parallel |
@@ -86,6 +86,10 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
       the log before reading the secondaries, so a bad one left a half
       update. Every superblock is now read and checked before the first
       write (`set_label` too); unit test in `src/admin.rs`.
+- [x] Review #22, 2026-11-21: `FileDevice` I/O moved to the blocking pool
+      (it ran on the runtime worker without yielding); short images are
+      `NotXfs` (check from #20, now tested through `FileDevice`).
+      `tests/device_io.rs`.
 - [ ] Overwrite hygiene: stale secondaries, discard — issue #5
 - [x] `xfs_admin -U/-L` over `BlockDevice` for stormblock's clones — issue #6,
       done 2026-10-06 (v0.3.0). `admin::set_uuid` = xfs_db `uuid_f`:

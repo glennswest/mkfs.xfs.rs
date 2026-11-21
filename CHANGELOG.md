@@ -3,6 +3,15 @@
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
+### Changed
+- `FileDevice` does its reads, writes, flushes and zeroing on tokio's
+  blocking pool (`spawn_blocking`) instead of on the runtime worker. A
+  2 GiB log zeroing no longer stalls other tasks (timers too, on a
+  current-thread runtime), and concurrent AG writes really run
+  concurrently. Each read and write costs one buffer copy (#22, finding
+  852fbf8ad41a). Test: `file_device_io_yields_the_runtime_worker` in
+  `tests/device_io.rs`.
+
 ### Fixed
 - `admin::set_uuid` and `admin::set_label` read and check (magic, CRC)
   every AG's superblock before the first write. A bad secondary used to be
@@ -10,6 +19,10 @@
   leaving the primary on the old one; it is now refused (`Error::Corrupt`)
   with the device untouched (#21, finding 357682ff6c3e). Unit test
   `bad_secondary_is_refused_before_any_write` in `src/admin.rs`.
+- An empty or one-byte image is `Error::NotXfs` from `inspect::geometry`,
+  `dump` and `admin`, not a panic (#22, finding 12ddb7cbd34e). The length
+  check came with #20; `empty_and_one_byte_images_are_not_xfs` in
+  `tests/device_io.rs` now holds it through a `FileDevice`.
 
 ## [v0.4.0] — 2026-11-21
 

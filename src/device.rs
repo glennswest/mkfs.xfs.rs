@@ -15,7 +15,7 @@
 use std::collections::BTreeMap;
 use std::io;
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use crate::error::{Error, Result};
 
@@ -77,8 +77,15 @@ pub(crate) fn check_bounds(offset: u64, len: u64, size: u64) -> Result<()> {
 
 /// A device backed by a file or a raw block device, with positional I/O so
 /// concurrent writes to disjoint ranges do not contend on a cursor.
+///
+/// Every read, write, flush and zeroing runs on tokio's blocking pool
+/// (`spawn_blocking`), never on a runtime worker: awaiting one releases the
+/// worker, so a 2 GiB log zeroing does not stall other tasks (timers
+/// included, on a current-thread runtime), and concurrent AG writes really
+/// run concurrently. Reads and writes go through an owned buffer, which
+/// costs one copy per call.
 pub struct FileDevice {
-    file: std::fs::File,
+    file: Arc<std::fs::File>,
     size: u64,
     logical: u32,
     physical: u32,
@@ -109,7 +116,7 @@ impl FileDevice {
         let regular = meta.is_file();
         let size = if regular { meta.len() } else { seek_size(&file)? };
         let (logical, physical) = sector_sizes(&file, regular);
-        Ok(Self { file, size, logical, physical, regular })
+        Ok(Self { file: Arc::new(file), size, logical, physical, regular })
     }
 
     /// Create (or truncate) a sparse file of exactly `size` bytes.
@@ -128,7 +135,7 @@ impl FileDevice {
         .await
         .map_err(|e| Error::io(0, io::Error::other(e)))?
         .map_err(|e| Error::io(0, e))?;
-        Ok(Self { file, size, logical: 512, physical: 512, regular: true })
+        Ok(Self { file: Arc::new(file), size, logical: 512, physical: 512, regular: true })
     }
 
     /// Declare the sector size of the device an image is being built for. A
@@ -176,40 +183,74 @@ impl BlockDevice for FileDevice {
     async fn read_at(&self, offset: u64, buf: &mut [u8]) -> Result<()> {
         use std::os::unix::fs::FileExt;
         check_bounds(offset, buf.len() as u64, self.size)?;
-        self.file.read_exact_at(buf, offset).map_err(|e| Error::io(offset, e))
+        let mut owned = vec![0u8; buf.len()];
+        let owned = self
+            .blocking(offset, move |f| f.read_exact_at(&mut owned, offset).map(|()| owned))
+            .await?;
+        buf.copy_from_slice(&owned);
+        Ok(())
     }
 
     async fn write_at(&self, offset: u64, buf: &[u8]) -> Result<()> {
         use std::os::unix::fs::FileExt;
         check_bounds(offset, buf.len() as u64, self.size)?;
-        self.file.write_all_at(buf, offset).map_err(|e| Error::io(offset, e))
+        let owned = buf.to_vec();
+        self.blocking(offset, move |f| f.write_all_at(&owned, offset)).await
     }
 
     async fn flush(&self) -> Result<()> {
-        self.file.sync_data().map_err(|e| Error::io(0, e))
+        self.blocking(0, |f| f.sync_data()).await
     }
 
     async fn write_zeroes(&self, offset: u64, len: u64) -> Result<()> {
         check_bounds(offset, len, self.size)?;
-        // A regular file punches the range out: it reads back as zeroes and
-        // stays sparse, which is what an image file wants.
-        #[cfg(target_os = "linux")]
-        if self.regular {
-            use rustix::fs::{fallocate, FallocateFlags};
-            let flags = FallocateFlags::PUNCH_HOLE | FallocateFlags::KEEP_SIZE;
-            if fallocate(&self.file, flags, offset, len).is_ok() {
-                return Ok(());
+        let regular = self.regular;
+        // One blocking job for the whole range, so the loop below never
+        // runs on a runtime worker.
+        self.blocking(offset, move |f| {
+            // A regular file punches the range out: it reads back as zeroes
+            // and stays sparse, which is what an image file wants.
+            #[cfg(target_os = "linux")]
+            if regular {
+                use rustix::fs::{fallocate, FallocateFlags};
+                let flags = FallocateFlags::PUNCH_HOLE | FallocateFlags::KEEP_SIZE;
+                if fallocate(f, flags, offset, len).is_ok() {
+                    return Ok(());
+                }
             }
-        }
-        let zeroes = vec![0u8; (1u64 << 20).min(len).max(1) as usize];
-        let mut done = 0u64;
-        while done < len {
-            let n = (len - done).min(zeroes.len() as u64) as usize;
-            self.write_at(offset + done, &zeroes[..n]).await?;
-            done += n as u64;
-        }
-        Ok(())
+            let _ = regular;
+            zero_range(f, offset, len)
+        })
+        .await
     }
+}
+
+impl FileDevice {
+    /// Run `op` on the file in tokio's blocking pool.
+    async fn blocking<T, F>(&self, offset: u64, op: F) -> Result<T>
+    where
+        T: Send + 'static,
+        F: FnOnce(&std::fs::File) -> io::Result<T> + Send + 'static,
+    {
+        let file = Arc::clone(&self.file);
+        tokio::task::spawn_blocking(move || op(&file))
+            .await
+            .map_err(|e| Error::io(offset, io::Error::other(e)))?
+            .map_err(|e| Error::io(offset, e))
+    }
+}
+
+/// Write `len` zero bytes at `offset`, 1 MiB at a time.
+fn zero_range(f: &std::fs::File, offset: u64, len: u64) -> io::Result<()> {
+    use std::os::unix::fs::FileExt;
+    let zeroes = vec![0u8; (1u64 << 20).min(len).max(1) as usize];
+    let mut done = 0u64;
+    while done < len {
+        let n = (len - done).min(zeroes.len() as u64) as usize;
+        f.write_all_at(&zeroes[..n], offset + done)?;
+        done += n as u64;
+    }
+    Ok(())
 }
 
 /// Granularity of [`MemDevice`]'s sparse storage.

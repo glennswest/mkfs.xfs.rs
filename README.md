@@ -38,7 +38,10 @@ a `/dev` node. `MemDevice` is sparse, so a 1 PiB filesystem formats in memory
 in a fraction of a second. The trait's default `write_zeroes` writes zero
 blocks, 1 MiB at a time; a device with write-zeroes or a discard that zeroes
 should override it, since the log alone can be 2 GiB (`FileDevice` punches
-holes in regular files).
+holes in regular files). `FileDevice` runs every read, write, flush and
+zeroing on tokio's blocking pool, so it never holds a runtime worker, and its
+AG writes run concurrently. It needs a tokio runtime; a current-thread one
+will do.
 
 Every `Params` field is optional and left to `mkfs.xfs`'s choice when unset
 (`agsize`, `imaxpct` and the rest are public fields; the common ones also
