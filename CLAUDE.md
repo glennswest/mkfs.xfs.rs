@@ -82,6 +82,10 @@ output by a comparison tool and golden tests, async block I/O, no kernel.
       length, logarithms, inode/block sizes, last AG and log before use;
       `dump_tree` refuses repeated blocks and level skips. Unit tests in
       `src/inspect.rs`.
+- [x] Admin write ordering — issue #21, 2026-11-21: `set_uuid` cleared
+      the log before reading the secondaries, so a bad one left a half
+      update. Every superblock is now read and checked before the first
+      write (`set_label` too); unit test in `src/admin.rs`.
 - [ ] Overwrite hygiene: stale secondaries, discard — issue #5
 - [x] `xfs_admin -U/-L` over `BlockDevice` for stormblock's clones — issue #6,
       done 2026-10-06 (v0.3.0). `admin::set_uuid` = xfs_db `uuid_f`:

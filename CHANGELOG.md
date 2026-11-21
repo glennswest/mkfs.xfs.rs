@@ -3,6 +3,14 @@
 ## [Unreleased]
 <!-- New unreleased changes go here -->
 
+### Fixed
+- `admin::set_uuid` and `admin::set_label` read and check (magic, CRC)
+  every AG's superblock before the first write. A bad secondary used to be
+  found only after the whole log had been rewritten under the new UUID,
+  leaving the primary on the old one; it is now refused (`Error::Corrupt`)
+  with the device untouched (#21, finding 357682ff6c3e). Unit test
+  `bad_secondary_is_refused_before_any_write` in `src/admin.rs`.
+
 ## [v0.4.0] — 2026-11-21
 
 ### Added

@@ -28,6 +28,10 @@
 //! also turns a quota inode of 0 into `NULLFSINO` and copies
 //! `sb_features2` into `sb_bad_features2`.
 //!
+//! Every superblock is read and checked (magic, CRC) before anything is
+//! written: a bad secondary is refused ([`Error::Corrupt`]) with the log
+//! and every superblock untouched.
+//!
 //! Refused: a filesystem marked `NEEDSREPAIR` ([`Error::NeedsRecovery`],
 //! as `xfs_db` refuses it), and — [`Error::Unsupported`] — one with an
 //! external log, a realtime device, or an incompat feature this crate does
@@ -70,9 +74,15 @@ const CHUNK: usize = 4 << 20;
 /// Give the filesystem the UUID `uuid`, as `xfs_admin -U` does: check the
 /// log is clean, rewrite it under the new UUID, then rewrite every
 /// allocation group's superblock (primary first). Flushes before
-/// returning.
+/// returning. Every superblock's magic and CRC are checked before the
+/// first write, so a bad one ([`Error::Corrupt`]) leaves the device as it
+/// was.
 pub async fn set_uuid<D: BlockDevice + ?Sized>(dev: &D, uuid: [u8; 16]) -> Result<()> {
     let fs = Fs::open(dev).await?;
+
+    // Every superblock is read and checked before anything is written, so
+    // a bad secondary is refused with the device untouched (#21).
+    let sbs = fs.read_all_sbs().await?;
 
     // sb_logzero: refuse a dirty log, then clear it at the next cycle.
     let state = LogReader::new(dev, &fs)?.find_tail().await?;
@@ -88,8 +98,7 @@ pub async fn set_uuid<D: BlockDevice + ?Sized>(dev: &D, uuid: [u8; 16]) -> Resul
 
     // do_uuid in each AG, against the primary's metadata UUID.
     let meta = fs.meta_uuid();
-    for agno in 0..fs.geo.agcount {
-        let mut b = fs.read_sb(agno).await?;
+    for (agno, mut b) in (0..).zip(sbs) {
         let incompat = be32(&b, off::FEATURES_INCOMPAT);
         let has_meta = incompat & version::IN_META_UUID != 0;
         let mut incompat_new = incompat;
@@ -121,7 +130,8 @@ pub async fn restore_uuid<D: BlockDevice + ?Sized>(dev: &D) -> Result<bool> {
 }
 
 /// Set the filesystem label (`sb_fname`) in every superblock, as
-/// `xfs_admin -L` does. An empty label clears it.
+/// `xfs_admin -L` does. An empty label clears it. As with [`set_uuid`],
+/// every superblock is checked before the first write.
 ///
 /// `xfs_admin` truncates a label over [`LABEL_MAX`] bytes, and reads `--`
 /// as "clear"; both are the command line's business, so here a longer
@@ -136,8 +146,8 @@ pub async fn set_label<D: BlockDevice + ?Sized>(dev: &D, label: &str) -> Result<
     let fs = Fs::open(dev).await?;
     let mut fname = [0u8; LABEL_MAX];
     fname[..label.len()].copy_from_slice(label.as_bytes());
-    for agno in 0..fs.geo.agcount {
-        let mut b = fs.read_sb(agno).await?;
+    let sbs = fs.read_all_sbs().await?;
+    for (agno, mut b) in (0..).zip(sbs) {
         b[off::FNAME..off::FNAME + LABEL_MAX].copy_from_slice(&fname);
         fs.write_sb(agno, b).await?;
     }
@@ -217,6 +227,17 @@ impl<'a, D: BlockDevice + ?Sized> Fs<'a, D> {
             return Err(Error::Corrupt(format!("AG {agno} superblock: bad CRC")));
         }
         Ok(b)
+    }
+
+    /// Every AG's superblock, each checked as [`Self::read_sb`] checks it,
+    /// read before the caller writes anything.
+    async fn read_all_sbs(&self) -> Result<Vec<Vec<u8>>> {
+        let mut sbs = Vec::with_capacity(self.geo.agcount as usize);
+        sbs.push(self.primary.clone());
+        for agno in 1..self.geo.agcount {
+            sbs.push(self.read_sb(agno).await?);
+        }
+        Ok(sbs)
     }
 
     /// Write a superblock back as `libxfs_sb_to_disk` and the write
@@ -681,5 +702,36 @@ mod tests {
         dev.write_at(0, &b).await.unwrap();
         assert!(matches!(set_uuid(&dev, NEW).await, Err(Error::NeedsRecovery(_))));
         assert!(matches!(set_label(&dev, "x").await, Err(Error::NeedsRecovery(_))));
+    }
+
+    /// #21 (finding 357682ff6c3e): a bad secondary superblock is found
+    /// before the log or any superblock is written, so the refused
+    /// operation leaves the device byte for byte as it was.
+    #[tokio::test]
+    async fn bad_secondary_is_refused_before_any_write() {
+        let dev = fresh(1 << 30, Params::new()).await;
+        let fs = Fs::open(&dev).await.unwrap();
+        let last = fs.geo.agcount - 1;
+        let at = fs.sb_offset(last);
+        drop(fs);
+
+        // Bad CRC in the last AG's superblock.
+        let mut b = sb_of(&dev, last).await;
+        b[off::FNAME] ^= 0xff;
+        dev.write_at(at, &b).await.unwrap();
+        let before = dev.nonzero_chunks();
+        assert!(matches!(set_uuid(&dev, NEW).await, Err(Error::Corrupt(_))));
+        assert!(dev.nonzero_chunks() == before, "set_uuid wrote before refusing");
+        assert!(matches!(set_label(&dev, "x").await, Err(Error::Corrupt(_))));
+        assert!(dev.nonzero_chunks() == before, "set_label wrote before refusing");
+
+        // No magic at all.
+        b[off::MAGICNUM..off::MAGICNUM + 4].fill(0);
+        crc::stamp(&mut b[..512], off::CRC);
+        dev.write_at(at, &b).await.unwrap();
+        let before = dev.nonzero_chunks();
+        assert!(matches!(set_uuid(&dev, NEW).await, Err(Error::Corrupt(_))));
+        assert!(dev.nonzero_chunks() == before, "set_uuid wrote before refusing");
+        assert_eq!(log_state(&dev).await.unwrap().cycle, 1);
     }
 }
